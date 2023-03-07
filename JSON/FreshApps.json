@@ -23,7 +23,7 @@
         },
         {
             "appType": "SELF_SIGN",
-            "appCateIndex": 0,
+            "appCateIndex": 1,
             "appUpdateTime": "2023-03-07T14:01:00+0300",
             "appName": "Melodious",
             "appVersion": "7.1",
@@ -33,7 +33,7 @@
         },
         {
             "appType": "SELF_SIGN",
-            "appCateIndex": 0,
+            "appCateIndex": 2,
             "appUpdateTime": "2023-03-07T14:02:00+0300",
             "appName": "InShot",
             "appVersion": "1.66.0",
@@ -43,7 +43,7 @@
         },
         {
             "appType": "SELF_SIGN",
-            "appCateIndex": 0,
+            "appCateIndex": 3,
             "appUpdateTime": "2023-03-07T14:03:00+0300",
             "appName": "LittleQ",
             "appVersion": "3.3.5",
