@@ -1,12 +1,12 @@
 {
     "version": "1.0",
-    "sourceName": "FreshAppsName",
+    "sourceName": "FreshApps",
     "sourceAuthor": "FreshAppsAuthor",
-    "sourceLinkTitle": "SourceLinkTitle",
+    "sourceLinkTitle": "@FreshApps",
     "sourceLinkUrl": "https://propubg.app",
     "sourceImage": "https://propubg.app/static/images/header/logo.png",
-    "sourceUpdateTime": "2023-02-23T14:00:00+0300",
-    "sourceDescription": "SourceDescription",
+    "sourceUpdateTime": "2023-03-07T14:55:00+0300",
+    "sourceDescription": "Here can be any description",
     "appCategories": [
         "AppCategories"
     ],
@@ -14,33 +14,43 @@
         {
             "appType": "SELF_SIGN",
             "appCateIndex": 0,
-            "appUpdateTime": "2023-02-23T08:00:00+0800",
-            "appName": "GBox",
-            "appVersion": "1.3.6",
-            "appImage": "https://gbox.run/Public/images/icon.png",
-            "appPackage": "https://dev.tencent.com/u/wallace_leung/p/AppHub/git/raw/master/Xero/GBox_v1.3.6_1122.ipa",
-            "appDescription": "App的描述"
+            "appUpdateTime": "2023-03-07T14:00:00+0300",
+            "appName": "iCabMobile",
+            "appVersion": "10.7.1",
+            "appImage": "https://is5-ssl.mzstatic.com/image/thumb/Purple122/v4/79/e4/81/79e48130-2db9-07f1-c1bc-f782eaac7ee0/AppIcon-0-0-1x_U007emarketing-0-0-0-6-0-0-sRGB-0-0-0-GLES2_U002c0-512MB-85-220-0-0.jpeg/512x512bb.jpg",
+            "appPackage": "https://prokopenkoaleksandr.github.io/Applications/iCabMobile_10.7.1.ipa",
+            "appDescription": "iCab Mobile is a web browser for the iOS. It provides many unique and useful features you won't find in other iPhone browsers."
         },
-
         {
             "appType": "SELF_SIGN",
-            "appCateIndex": 1,
-            "appUpdateTime": "2023-02-24T08:00:00+0800",
-            "appName": "LSearch",
-            "appVersion": "1.0",
-            "appPlist": "https://www.lanzous.com/i7rn4hi",
-            "appDescription": "VIP测试用，点下载，然后签名，再安装，如果能正常打开，则证明VIP成功"
-        },
-
-        {
-            "appType": "LINK",
             "appCateIndex": 0,
-            "appUpdateTime": "2023-12-27T9:30:00+0800",
-            "appName": "GBox官网",
-            "appVersion": "1.0",
-            "appImage": "https://dev.tencent.com/u/wallace_leung/p/AppHub/git/raw/master/Xero/icon512.png",
-            "appLink": "https://gbox.run",
-            "appDescription": "网页连接测试"
-        }
+            "appUpdateTime": "2023-03-07T14:01:00+0300",
+            "appName": "Melodious",
+            "appVersion": "7.1",
+            "appImage": "",
+            "appPackage": "https://prokopenkoaleksandr.github.io/Applications/Melodious 2023.7.1.ipa",
+            "appDescription": "Приложение для прослушивания и загрузки музыки из ВК"
+        },
+        {
+            "appType": "SELF_SIGN",
+            "appCateIndex": 0,
+            "appUpdateTime": "2023-03-07T14:02:00+0300",
+            "appName": "InShot",
+            "appVersion": "1.66.0",
+            "appImage": "https://i0.wp.com/techiespad.com/wp-content/uploads/2020/04/Install-InShot-For-PC.png?fit=1280%2C720&ssl=1",
+            "appPackage": "https://prokopenkoaleksandr.github.io/Applications/InShot_1.66.0.ipa",
+            "appDescription": "Редактор фото и видео с большим количеством функций."
+        },
+        {
+            "appType": "SELF_SIGN",
+            "appCateIndex": 0,
+            "appUpdateTime": "2023-03-07T14:03:00+0300",
+            "appName": "LittleQ",
+            "appVersion": "3.3.5",
+            "appImage": "",
+            "appPackage": "https://prokopenkoaleksandr.github.io/Applications/LittleQ_3.3.5.ipa",
+            "appDescription": "Приложение для изменения голоса"
+        },
+        
     ]
 }
