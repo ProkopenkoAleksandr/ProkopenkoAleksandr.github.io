@@ -1,0 +1,12 @@
+{
+    "applications": [
+        {
+            "id": 0,
+            "appName": "Spaceflight News",
+            "showFailedScreen": false,
+            "urlImageForFailedScreen": "",
+            "urlForFailedScreen": "",
+            "urlForAd": "",
+        }
+    ]
+}
