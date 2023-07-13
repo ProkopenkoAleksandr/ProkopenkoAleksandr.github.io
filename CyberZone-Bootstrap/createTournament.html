@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="createTournament.css">
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/jquery/latest/jquery.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css"/>
+
+    <title>Cоздание турнира</title>
+</head>
+<body>
+
+
+<!-- Текст. Основные настройки турнира-->
+<div class="row">
+
+    <div class="col-2 col-md-3"></div>
+
+    <div class="col-8 col-md-6">
+        <h4>Основные настройки турнира</h4>
+    </div>
+
+</div>
+
+<!-- Основные настройки для турнира -->
+<div class="row">
+
+    <div class="col-2 col-md-3"></div>
+
+    <div class="col-8 col-md-6">
+
+        <!-- Ввод названия турнира -->
+        <div class="row align-items-baseline">
+            <div class="tournament_name input-group col-12 col-md-8">
+                <input type="text" class="form-control" placeholder="Введите название турнира" aria-label="Введите название турнира" aria-describedby="basic-addon1">
+            </div>
+        </div>
+
+        <!-- Призовой фонд -->
+        <div class="row align-items-baseline d-flex">
+            <p>Призовой фонд: </p>
+            <div class="input-group mb-3 col-8">
+                <input type="text" class="form-control" aria-label="Text input with dropdown button" placeholder="Сумма">
+                <div class="input-group-append">
+                    <button class="btn btn-outline-secondary dropdown-toggle dropdownTogglePrizePoolCurrency" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Валюта</button>
+                    <div class="dropdown-menu">
+                        <a class="dropdown-item prizePoolCurrency" href="#">$</a>
+                        <a class="dropdown-item prizePoolCurrency" href="#">₴</a>
+                        <a class="dropdown-item prizePoolCurrency" href="#">₽</a>
+                        <a class="dropdown-item prizePoolCurrency" href="#">₸</a>
+                        <a class="dropdown-item prizePoolCurrency" href="#">Узб. сўм</a>
+                        <a class="dropdown-item prizePoolCurrency" href="#">UC (игровая валюта)</a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Пруф линки -->
+        <div class="row align-items-baseline mb-2">
+            <div class="input-group">
+                <span class="input-group-text">Пруф линки:</span>
+                <textarea class="form-control" aria-label="With textarea"></textarea>
+            </div>
+        </div>
+
+        <!-- Выбор стадий -->
+        <div class="row align-items-baseline">
+            <p>Стадии турнира: </p>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" id="inlineCheckbox1" value="oneEight" checked>
+                <label class="form-check-label" for="inlineCheckbox1">1/8</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" id="inlineCheckbox2" value="quarterfinal" checked>
+                <label class="form-check-label" for="inlineCheckbox2">1/4</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" id="inlineCheckbox3" value="semifinal" checked>
+                <label class="form-check-label" for="inlineCheckbox3">1/2</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" id="inlineCheckbox4" value="final" checked>
+                <label class="form-check-label" for="inlineCheckbox4">Финал</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" id="inlineCheckbox5" value="grand-final">
+                <label class="form-check-label" for="inlineCheckbox5">Гранд-финал</label>
+            </div>
+        </div>
+
+        <!-- Выбор лица для турнира -->
+        <div class="row align-items-baseline">
+            <p>Лицо:</p>
+            <div class="dropdown">
+                <button class="btn btn-primary dropdown-toggle generalFaceDropdownButton" type="button" data-toggle="dropdown"></button>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item generalFaceDropdownItem" href="#" data-value="TPP">TPP</a>
+                    <a class="dropdown-item generalFaceDropdownItem" href="#" data-value="FPP">FPP</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Выбор количества игроков в команде -->
+        <div class="row align-items-baseline">
+            <p>Количество игроков в 1 команде:</p>
+            <div class="dropdown">
+                <button class="btn btn-primary dropdown-toggle generalAmountOfMemberInTeamButton" type="button" data-toggle="dropdown" disabled></button>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item generalAmountOfMembersInTeamDropdownItem" href="#" data-value="Solo">Solo</a>
+                    <a class="dropdown-item generalAmountOfMembersInTeamDropdownItem" href="#" data-value="Duo">Duo</a>
+                    <a class="dropdown-item generalAmountOfMembersInTeamDropdownItem" href="#" data-value="Squad">Squad</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Выбор режима турнира  -->
+        <div class="row align-items-baseline">
+            <p>Режим: </p>
+            <div class="dropdown">
+                <button class="btn btn-primary dropdown-toggle generalModeButton" type="button" data-toggle="dropdown" disabled></button>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item generalModeDropdownItem" href="#" data-value="Классический">Классический</a>
+                    <a class="dropdown-item generalModeDropdownItem" href="#" data-value="TDM">TDM</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Выбор количества команд для турнира -->
+        <div class="row align-items-baseline">
+            <p>Общее количество команд:</p>
+            <div class="dropdown">
+                <button class="btn btn-primary dropdown-toggle generalAmountOfTeamsButton" type="button" data-toggle="dropdown" disabled></button>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="64">64</a>
+                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="128">128</a>
+                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="224">224</a>
+                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="256">256</a>
+                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="288">288</a>
+                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="328">328</a>
+                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="360">360</a>
+                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="480">480</a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="d-flex justify-content-center">
+    <button type="button" class="col-md-2 btn btn-warning" id="generalSaveButton" disabled>Сохранить</button>
+</div>
+
+<script>
+
+    const generalData = {
+        face: "",
+        faceDropdownItem: document.getElementsByClassName('generalFaceDropdownItem'),
+        faceDropdownButton: document.querySelector('.generalFaceDropdownButton'),
+        amountOfMembersInTeam: "",
+        amountOfMembersInTeamDropdownItem: document.getElementsByClassName('generalAmountOfMembersInTeamDropdownItem'),
+        amountOfMemberInTeamButton: document.querySelector(".generalAmountOfMemberInTeamButton"),
+        minAmountOfTeamsInGroup: 0,
+        maxAmountOfTeamsInGroup: 0,
+        mode: "",
+        modeDropdownItem: document.getElementsByClassName('generalModeDropdownItem'),
+        modeButton: document.querySelector(".generalModeButton"),
+        amountOfTeams: 0,
+        amountOfTeamsDropdownItem: document.getElementsByClassName('generalAmountOfTeamsDropdownItem'),
+        amountOfTeamsButton: document.querySelector(".generalAmountOfTeamsButton"),
+        сheckboxes: document.querySelectorAll('input[type="checkbox"]'),
+        saveButton: document.getElementById('generalSaveButton')
+    }
+
+    let oneEightData = {
+        stage: "oneEight",
+        amountOfGroups: 0,
+        amountOfGroupsDropdownMenu: document.querySelector('.oneEightAmountOfGroupsDropdownMenu'),
+        amountOfGroupsDropdownItem: document.getElementsByClassName('oneEightAmountOfGroupsDropdownItem'),
+        amountOfGroupsButton: document.querySelector('.oneEightAmountOfGroupsButton'),
+        amountOfVIPSlots: 0,
+        passToNextStage: 0,
+        passToNextStageDropdownMenu: document.querySelector('.oneEightPassToNextStageDropdownMenu'),
+        passToNextStageDropdownItem: document.getElementsByClassName('oneEightPassToNextStageDropdownItem'),
+        passToNextStageButton: document.querySelector('.oneEightPassToNextStageButton'),
+        startDateForStageTimestamp: 0,
+        endDatForStageTimestamp: 0,
+        datePickerInput: document.querySelector('input[class="oneEightDatePickerInput"]'),
+        amountOfDaysForStage: 0,
+        amountOfSessionsInOneDay: 0,
+        amountOfSessionsInOneDayDropdownMenu: document.querySelector('.oneEightAmountOfSessionsInOneDayDropdownMenu'),
+        amountOfSessionsInOneDayDropdownItem: document.getElementsByClassName('oneEightAmountOfSessionsInOneDayDropdownItem'),
+        amountOfSessionsInOneDayButton: document.querySelector('.oneEightAmountOfSessionsInOneDayButton'),
+        timeOfSessionsDictionary: {},
+        mainRowForSettings: document.getElementById('oneEightMainRowForSettings'),
+        saveButton: document.getElementById('oneEightSaveButton')
+    }
+
+    let quarterfinalData = {
+        stage: "quarterfinal",
+        amountOfGroups: 0,
+        amountOfGroupsDropdownMenu: document.querySelector('.quarterfinalAmountOfGroupsDropdownMenu'),
+        amountOfGroupsDropdownItem: document.getElementsByClassName('quarterfinalAmountOfGroupsDropdownItem'),
+        amountOfGroupsButton: document.querySelector('.quarterfinalAmountOfGroupsButton'),
+        amountOfInvitesInGroup: 0,
+        amountOfInvitesInGroupDropdownMenu: document.querySelector('.quarterfinalAmountOfInvitesInGroupDropdownMenu'),
+        amountOfInvitesInGroupDropdownItem: document.getElementsByClassName('quarterfinalAmountOfInvitesInGroupDropdownItem'),
+        amountOfInvitesInGroupButton: document.querySelector('.quarterfinalAmountOfInvitesInGroupButton'),
+        amountOfVIPSlots: 0,
+        passToNextStage: 0,
+        passToNextStageDropdownMenu: document.querySelector('.quarterfinalPassToNextStageDropdownMenu'),
+        passToNextStageDropdownItem: document.getElementsByClassName('quarterfinalPassToNextStageDropdownItem'),
+        passToNextStageButton: document.querySelector('.quarterfinalPassToNextStageButton'),
+        startDateForStageTimestamp: 0,
+        endDatForStageTimestamp: 0,
+        datePickerInput: document.querySelector('input[class="quarterfinalDatePickerInput"]'),
+        amountOfDaysForStage: 0,
+        amountOfSessionsInOneDay: 0,
+        amountOfSessionsInOneDayDropdownMenu: document.querySelector('.quarterfinalAmountOfSessionsInOneDayDropdownMenu'),
+        amountOfSessionsInOneDayDropdownItem: document.getElementsByClassName('quarterfinalAmountOfSessionsInOneDayDropdownItem'),
+        amountOfSessionsInOneDayButton: document.querySelector('.quarterfinalAmountOfSessionsInOneDayButton'),
+        timeOfSessionsDictionary: {},
+        mainRowForSettings: document.getElementById('quarterfinalMainRowForSettings')
+    }
+
+    let semifinalData = {
+        stage: "semifinal",
+        amountOfGroups: 0,
+        amountOfGroupsDropdownMenu: document.querySelector('.semifinalAmountOfGroupsDropdownMenu'),
+        amountOfGroupsDropdownItem: document.getElementsByClassName('semifinalAmountOfGroupsDropdownItem'),
+        amountOfGroupsButton: document.querySelector('.semifinalAmountOfGroupsButton'),
+        amountOfInvitesInGroup: 0,
+        amountOfInvitesInGroupDropdownMenu: document.querySelector('.semifinalAmountOfInvitesInGroupDropdownMenu'),
+        amountOfInvitesInGroupDropdownItem: document.getElementsByClassName('semifinalAmountOfInvitesInGroupDropdownItem'),
+        amountOfInvitesInGroupButton: document.querySelector('.semifinalAmountOfInvitesInGroupButton'),
+        amountOfVIPSlots: 0,
+        passToNextStage: 0,
+        passToNextStageDropdownMenu: document.querySelector('.semifinalPassToNextStageDropdownMenu'),
+        passToNextStageDropdownItem: document.getElementsByClassName('semifinalPassToNextStageDropdownItem'),
+        passToNextStageButton: document.querySelector('.semifinalPassToNextStageButton'),
+        startDateForStageTimestamp: 0,
+        endDatForStageTimestamp: 0,
+        datePickerInput: document.querySelector('input[class="semifinalDatePickerInput"]'),
+        amountOfDaysForStage: 0,
+        amountOfSessionsInOneDay: 0,
+        amountOfSessionsInOneDayDropdownMenu: document.querySelector('.semifinalAmountOfSessionsInOneDayDropdownMenu'),
+        amountOfSessionsInOneDayDropdownItem: document.getElementsByClassName('semifinalAmountOfSessionsInOneDayDropdownItem'),
+        amountOfSessionsInOneDayButton: document.querySelector('.semifinalAmountOfSessionsInOneDayButton'),
+        timeOfSessionsDictionary: {},
+        mainRowForSettings: document.getElementById('semifinalMainRowForSettings')
+    }
+
+    let finalData = {
+        stage: "final",
+        amountOfGroups: 0,
+        amountOfGroupsDropdownMenu: document.querySelector('.finalAmountOfGroupsDropdownMenu'),
+        amountOfGroupsDropdownItem: document.getElementsByClassName('finalAmountOfGroupsDropdownItem'),
+        amountOfGroupsButton: document.querySelector('.finalAmountOfGroupsButton'),
+        amountOfInvitesInGroup: 0,
+        amountOfInvitesInGroupDropdownMenu: document.querySelector('.finalAmountOfInvitesInGroupDropdownMenu'),
+        amountOfInvitesInGroupDropdownItem: document.getElementsByClassName('finalAmountOfInvitesInGroupDropdownItem'),
+        amountOfInvitesInGroupButton: document.querySelector('.finalAmountOfInvitesInGroupButton'),
+        amountOfVIPSlots: 0,
+        passToNextStage: 0,
+        passToNextStageDropdownMenu: document.querySelector('.finalPassToNextStageDropdownMenu'),
+        passToNextStageDropdownItem: document.getElementsByClassName('finalPassToNextStageDropdownItem'),
+        passToNextStageButton: document.querySelector('.finalPassToNextStageButton'),
+        startDateForStageTimestamp: 0,
+        endDatForStageTimestamp: 0,
+        datePickerInput: document.querySelector('input[class="finalDatePickerInput"]'),
+        amountOfDaysForStage: 0,
+        amountOfSessionsInOneDay: 0,
+        amountOfSessionsInOneDayDropdownMenu: document.querySelector('.finalAmountOfSessionsInOneDayDropdownMenu'),
+        amountOfSessionsInOneDayDropdownItem: document.getElementsByClassName('finalAmountOfSessionsInOneDayDropdownItem'),
+        amountOfSessionsInOneDayButton: document.querySelector('.finalAmountOfSessionsInOneDayButton'),
+        timeOfSessionsDictionary: {},
+        mainRowForSettings: document.getElementById('finalMainRowForSettings')
+    }
+
+    let grandfinalData = {
+        stage: "grandfinal",
+        amountOfGroups: 0,
+        amountOfGroupsDropdownMenu: document.querySelector('.grandfinalAmountOfGroupsDropdownMenu'),
+        amountOfGroupsDropdownItem: document.getElementsByClassName('grandfinalAmountOfGroupsDropdownItem'),
+        amountOfGroupsButton: document.querySelector('.grandfinalAmountOfGroupsButton'),
+        amountOfInvitesInGroup: 0,
+        amountOfInvitesInGroupDropdownMenu: document.querySelector('.grandfinalAmountOfInvitesInGroupDropdownMenu'),
+        amountOfInvitesInGroupDropdownItem: document.getElementsByClassName('grandfinalAmountOfInvitesInGroupDropdownItem'),
+        amountOfInvitesInGroupButton: document.querySelector('.grandfinalAmountOfInvitesInGroupButton'),
+        amountOfVIPSlots: 0,
+        passToNextStage: 0,
+        passToNextStageDropdownMenu: document.querySelector('.grandfinalPassToNextStageDropdownMenu'),
+        passToNextStageDropdownItem: document.getElementsByClassName('grandfinalPassToNextStageDropdownItem'),
+        passToNextStageButton: document.querySelector('.grandfinalPassToNextStageButton'),
+        startDateForStageTimestamp: 0,
+        endDatForStageTimestamp: 0,
+        datePickerInput: document.querySelector('input[class="grandfinalDatePickerInput"]'),
+        amountOfDaysForStage: 0,
+        amountOfSessionsInOneDay: 0,
+        amountOfSessionsInOneDayDropdownMenu: document.querySelector('.grandfinalAmountOfSessionsInOneDayDropdownMenu'),
+        amountOfSessionsInOneDayDropdownItem: document.getElementsByClassName('grandfinalAmountOfSessionsInOneDayDropdownItem'),
+        amountOfSessionsInOneDayButton: document.querySelector('.grandfinalAmountOfSessionsInOneDayButton'),
+        timeOfSessionsDictionary: {},
+        mainRowForSettings: document.getElementById('grandfinalMainRowForSettings')
+    }
+
+    const stages = []
+
+    let previousStageData = {}
+    let currentStageData = {}
+    let currentStageName = ''
+
+    <!-- Настройка выпадающего меню -->
+    $(document).ready(function() {
+        $('.dropdown-item').click(function() {
+            const value = $(this).data('value');
+            $(this).closest('.dropdown').find('.dropdown-toggle').html(value);
+        });
+    });
+
+    <!-- Определение выбора лица -->
+    for (let i = 0; i < generalData.faceDropdownItem.length; i++) {
+        generalData.faceDropdownItem[i].addEventListener('click', function() {
+            const selectedValue = this.getAttribute('data-value');
+            generalData.face = selectedValue
+            generalData.faceDropdownButton.setAttribute('disabled', 'disabled')
+            generalData.amountOfMemberInTeamButton.removeAttribute('disabled')
+        });
+    }
+
+    <!-- Определение выбора количества игроков в команде -->
+    for (let i = 0; i < generalData.amountOfMembersInTeamDropdownItem.length; i++) {
+        generalData.amountOfMembersInTeamDropdownItem[i].addEventListener('click', function() {
+            const selectedValue = this.getAttribute('data-value');
+            generalData.amountOfMembersInTeam = selectedValue
+            generalData.amountOfMemberInTeamButton.setAttribute('disabled', 'disabled')
+            generalData.modeButton.removeAttribute('disabled')
+            caclulateMinAndMaxAmountOfTeamsInGroup()
+        });
+    }
+
+    function caclulateMinAndMaxAmountOfTeamsInGroup() {
+        switch (generalData.amountOfMembersInTeam) {
+            case "Solo":
+                generalData.minAmountOfTeamsInGroup = 64;
+                generalData.maxAmountOfTeamsInGroup = 100 / 1;
+                break
+            case "Duo":
+                generalData.minAmountOfTeamsInGroup = 64 / 2;
+                generalData.maxAmountOfTeamsInGroup = 100 / 2;
+                break
+            case "Squad":
+                generalData.minAmountOfTeamsInGroup = 64 / 4;
+                generalData.maxAmountOfTeamsInGroup = 100 / 4;
+                break
+        }
+    }
+
+    <!-- Определение выбора режима -->
+    for (let i = 0; i < generalData.modeDropdownItem.length; i++) {
+        generalData.modeDropdownItem[i].addEventListener('click', function() {
+            const selectedValue = this.getAttribute('data-value');
+            generalData.mode = selectedValue
+            generalData.modeButton.setAttribute('disabled', 'disabled')
+            generalData.amountOfTeamsButton.removeAttribute('disabled')
+        });
+    }
+
+    <!-- Определение общего выбора количества команд -->
+    for (let i = 0; i < generalData.amountOfTeamsDropdownItem.length; i++) {
+        generalData.amountOfTeamsDropdownItem[i].addEventListener('click', function() {
+            const selectedValue = this.getAttribute('data-value');
+            generalData.amountOfTeams = selectedValue
+            generalData.amountOfTeamsButton.setAttribute('disabled', 'disabled')
+            generalData.saveButton.removeAttribute('disabled')
+        });
+    }
+
+    <!-- Нажатие на кнопку сохранить в основных настройках -->
+    generalData.saveButton.addEventListener('click', function() {
+        generalData.сheckboxes.forEach(function(checkbox) {
+            const checkboxValue = checkbox.value;
+            const isChecked = checkbox.checked;
+
+            if (isChecked) {
+                stages.push(checkboxValue)
+            }
+        });
+        switch (stages[0]) {
+            case 'oneEight':
+                currentStageName = 'oneEight'
+                createSectionOfStage('Настройка 1/8 стадии:', null, oneEightData, 'oneEight', false)
+                firstStageAmountOfGroupsCalculateAndPasteValues(currentStageData)
+                break
+        }
+
+    });
+
+    <!-- Количество групп -->
+    function firstStageAmountOfGroupsCalculateAndPasteValues(data) {
+        data.amountOfGroupsButton.removeAttribute('disabled')
+
+        let { amountOfGroupsDropdownMenu } = data;
+        amountOfGroupsDropdownMenu.innerHTML = '';
+
+        let minAmountOfGroups = 0;
+        let maxAmountOfGroups = 0;
+        switch (generalData.amountOfMembersInTeam) {
+            case "Solo":
+                minAmountOfGroups = Math.ceil(generalData.amountOfTeams / 100);
+                maxAmountOfGroups = Math.ceil(generalData.amountOfTeams / 64);
+                break
+            case "Duo":
+                minAmountOfGroups = Math.ceil(generalData.amountOfTeams / 50);
+                maxAmountOfGroups = Math.ceil(generalData.amountOfTeams / 32);
+                break
+            case "Squad":
+                minAmountOfGroups = Math.ceil(generalData.amountOfTeams / 25);
+                maxAmountOfGroups = Math.ceil(generalData.amountOfTeams / 16);
+                break
+        }
+
+        for (var i = minAmountOfGroups; i <= maxAmountOfGroups; i++) {
+            var newElement = document.createElement('a');
+            newElement.classList.add('dropdown-item');
+            newElement.classList.add(currentStageName + 'AmountOfGroupsDropdownItem');
+            newElement.href = '#';
+            newElement.setAttribute('data-value', i);
+            newElement.textContent = i;
+            if (i % 2 == 0) {
+                amountOfGroupsDropdownMenu.appendChild(newElement);
+            }
+        }
+
+        $('.dropdown-item').click(function() {
+            var value = $(this).data('value');
+            $(this).closest('.dropdown').find('.dropdown-toggle').html(value);
+            firstStageAmountOfGroupsEventListener(data)
+        });
+    }
+
+    function firstStageAmountOfGroupsEventListener(data) {
+        let { amountOfGroupsDropdownItem, amountOfGroupsButton, passToNextStageButton } = data;
+        for (let i = 0; i < amountOfGroupsDropdownItem.length; i++) {
+            amountOfGroupsDropdownItem[i].addEventListener('click', function() {
+                const selectedValue = this.getAttribute('data-value');
+                data.amountOfGroups = selectedValue
+                amountOfGroupsButton.setAttribute('disabled', 'disabled')
+                passToNextStageButton.removeAttribute('disabled')
+                firstStagePassToNextStageCalculateAndPasteValues(data, currentStageName)
+            });
+        }
+    }
+
+    <!-- Проход в следующую стадию -->
+    function firstStagePassToNextStageCalculateAndPasteValues(data) {
+        let { amountOfGroups, amountOfVIPSlots, passToNextStageDropdownMenu } = data;
+        var realValue = (amountOfGroups * generalData.maxAmountOfTeamsInGroup - generalData.amountOfTeams) / amountOfGroups
+        if (realValue >= 0) {
+            amountOfVIPSlots = realValue
+        }
+        passToNextStageDropdownMenu.innerHTML = '';
+        for (var i = 1; i <= Math.floor(generalData.maxAmountOfTeamsInGroup / 2); i++) {
+            var newElement = document.createElement('a');
+            newElement.classList.add('dropdown-item');
+            newElement.classList.add(currentStageName + 'PassToNextStageDropdownItem');
+            newElement.href = '#';
+            newElement.setAttribute('data-value', i);
+            newElement.textContent = i;
+            passToNextStageDropdownMenu.appendChild(newElement);
+        }
+
+        $('.dropdown-item').click(function() {
+            var value = $(this).data('value');
+            $(this).closest('.dropdown').find('.dropdown-toggle').html(value);
+        });
+        firstStagePassToNextStageEventListener(data)
+    }
+
+    function firstStagePassToNextStageEventListener(data) {
+        let { passToNextStageDropdownItem, passToNextStage, passToNextStageButton, datePickerInput } = data;
+        for (let i = 0; i < passToNextStageDropdownItem.length; i++) {
+            passToNextStageDropdownItem[i].addEventListener('click', function() {
+                const selectedValue = this.getAttribute('data-value');
+                data.passToNextStage = selectedValue
+                passToNextStageButton.setAttribute('disabled', 'disabled')
+                datePickerInput.removeAttribute('disabled');
+                <!-- Даты проведения этапа -->
+                $('input[class="oneEightDatePickerInput"]').on('apply.daterangepicker', function(ev, picker) {
+                    $(this).val(picker.startDate.format('DD/MM/YYYY') + ' - ' + picker.endDate.format('DD/MM/YYYY'));
+                    firstStageAmountOfDaysForStageCalculateAndPasteValues(picker, currentStageData, 'oneEight')
+                });
+            });
+        }
+    }
+
+    <!-- Количество игровых сессий в один день -->
+    function firstStageAmountOfDaysForStageCalculateAndPasteValues(picker, data, stage) {
+        let { amountOfDaysForStage, amountOfGroups, amountOfSessionsInOneDay, datePickerInput, amountOfSessionsInOneDayButton, amountOfSessionsInOneDayDropdownMenu } = data;
+        startDateForStageTimestamp = picker.startDate
+        endDateForStageTimestamp = picker.endDate + 1
+
+        const test = calculateAmountOfDaysBetweenTwoTimestamps(startDateForStageTimestamp, endDateForStageTimestamp)
+        data.amountOfDaysForStage = test;
+
+        if (amountOfGroups % test == 0) {
+            amountOfSessionsInOneDay = amountOfGroups / data.amountOfDaysForStage
+
+            datePickerInput.setAttribute('disabled', 'disabled')
+            amountOfSessionsInOneDayButton.removeAttribute('disabled')
+
+            amountOfSessionsInOneDayDropdownMenu.innerHTML = '';
+            var newElement = document.createElement('a');
+            newElement.classList.add('dropdown-item');
+            newElement.classList.add(stage + 'AmountOfSessionsInOneDayDropdownItem');
+            newElement.href = '#';
+            newElement.setAttribute('data-value', amountOfSessionsInOneDay);
+            newElement.textContent = amountOfSessionsInOneDay;
+            amountOfSessionsInOneDayDropdownMenu.appendChild(newElement);
+
+            $('.dropdown-item').click(function() {
+                var value = $(this).data('value');
+                $(this).closest('.dropdown').find('.dropdown-toggle').html(value);
+            });
+            firstStageAmountOfDaysForStageEventListener(data)
+        } else {
+            console.log('Перевыберите даты проведения 1/8, т.к. платформа не может работать с таким количеством групп и датами')
+            //   Здесь нужно вывести Toast с текстом из консоли. Я не смог его реализовать
+        }
+    }
+
+    function firstStageAmountOfDaysForStageEventListener(data) {
+        let { amountOfSessionsInOneDayDropdownItem, amountOfSessionsInOneDayButton } = data;
+        for (let i = 0; i < amountOfSessionsInOneDayDropdownItem.length; i++) {
+            amountOfSessionsInOneDayDropdownItem[i].addEventListener('click', function() {
+                const selectedValue = this.getAttribute('data-value');
+                data.amountOfSessionsInOneDay = selectedValue
+                amountOfSessionsInOneDayButton.setAttribute('disabled', 'disabled');
+                firstStageInsertionDivForChoosingTimeOfSession(data, 'oneEight');
+            });
+        }
+    }
+
+    <!-- Выбор времени для игровых сессий -->
+    function firstStageInsertionDivForChoosingTimeOfSession(data, stage) {
+        let { amountOfGroups, amountOfDaysForStage, amountOfSessionsInOneDay, timeOfSessionsDictionary } = data;
+        data.mainRowForSettings = document.getElementById('oneEightMainRowForSettings');
+
+        if (amountOfGroups != amountOfDaysForStage) {
+            for (let i = 1; i <= amountOfSessionsInOneDay; i++) {
+                createDivForSelectionTimeInSession(stage + 'TimeOfSessions', 'Время ' + i + ' игровой сессии', data.mainRowForSettings, i, timeOfSessionsDictionary)
+            }
+        } else {
+            for (let i = 1; i <= amountOfGroups; i++) {
+                createDivForSelectionTimeInSession(stage + 'TimeOfSessions', 'Время ' + i + ' игрового дня', data.mainRowForSettings, i, timeOfSessionsDictionary)
+            }
+        }
+        $('.dropdown-item').click(function() {
+            var value = $(this).data('value');
+            $(this).closest('.dropdown').find('.dropdown-toggle').html(value);
+        });
+    }
+
+    function createSectionOfStage(title, previousStageData, currentStageData, stageName, invites) {
+        createTitleOfSection(title);
+        createDiv(stageName, invites);
+        updateDataForStage(currentStageData, stageName);
+    }
+
+    function createTitleOfSection(title) {
+        const rowElement = document.createElement('div');
+        rowElement.className = 'row';
+
+        const firstDiv = document.createElement('div');
+        firstDiv.className = 'col-2 col-md-3';
+
+        const secondDiv = document.createElement('div');
+        secondDiv.className = 'col-10 col-md-6';
+
+        const headerElement = document.createElement('h4');
+        headerElement.textContent = title;
+
+        const thirdDiv = document.createElement('div');
+        thirdDiv.className = 'col-2 col-md-3';
+
+        rowElement.appendChild(firstDiv);
+        secondDiv.appendChild(headerElement);
+        rowElement.appendChild(secondDiv);
+        rowElement.appendChild(thirdDiv);
+        document.body.appendChild(rowElement);
+    }
+
+    function createDiv(stage, invites) {
+        const rowElement = document.createElement('div');
+        rowElement.className = 'row';
+
+        const firstDiv = document.createElement('div');
+        firstDiv.className = 'col-2 col-md-3';
+
+        const secondDiv = document.createElement('div');
+        secondDiv.className = 'col-10 col-md-6';
+        secondDiv.id = stage + 'MainRowForSettings';
+
+        const calendarDiv = document.createElement('div');
+        calendarDiv.className = 'row align-items-baseline';
+
+        const calendarDivParagraph = document.createElement('p');
+        calendarDivParagraph.textContent = "Даты проведения этапа: "
+
+        const calendarDivInput = document.createElement('input');
+        calendarDivInput.setAttribute('type', 'text');
+        calendarDivInput.className = stage + 'DatePickerInput';
+        calendarDivInput.setAttribute('name', 'datefilter');
+        calendarDivInput.setAttribute('value', '');
+        calendarDivInput.setAttribute('placeholder', 'Выберите даты');
+        calendarDivInput.setAttribute('disabled', 'disabled')
+
+        const thirdDiv = document.createElement('div');
+        thirdDiv.className = 'col-2 col-md-3';
+
+        rowElement.appendChild(firstDiv);
+        createElementForSecondDiv('Количество групп: ', stage, 'AmountOfGroups', false);
+        if (invites == true) {
+            createElementForSecondDiv('Количество инвайтов в одной группе: ', stage, 'AmountOfInvitesInGroup');
+        }
+        createElementForSecondDiv('Проход в следующую стадию: ', stage, 'PassToNextStage');
+        calendarDiv.appendChild(calendarDivParagraph);
+        calendarDiv.appendChild(calendarDivInput);
+        secondDiv.appendChild(calendarDiv);
+        createElementForSecondDiv('Количество игровых сессий в один день: ', stage, 'AmountOfSessionsInOneDay');
+        rowElement.appendChild(secondDiv);
+        rowElement.appendChild(thirdDiv);
+        document.body.appendChild(rowElement);
+
+        function createElementForSecondDiv(text, stage, className, disabled = true) {
+            const div = document.createElement('div');
+            div.className = 'row align-items-baseline';
+
+            const paragraph = document.createElement('p');
+            paragraph.textContent = text
+
+            const divDropdown = document.createElement('div');
+            divDropdown.className = 'dropdown';
+
+            const divDropdownButton = document.createElement('button');
+            divDropdownButton.className = 'btn btn-primary dropdown-toggle ' + stage + className + 'Button'
+            divDropdownButton.setAttribute('type', 'button');
+            divDropdownButton.setAttribute('data-toggle', 'dropdown');
+            if (disabled == true) {
+                divDropdownButton.setAttribute('disabled', 'disabled');
+            }
+
+            const divDropdownDiv = document.createElement('div');
+            divDropdownDiv.className = 'dropdown-menu ' + stage + className + 'DropdownMenu';
+
+            divDropdown.appendChild(divDropdownButton);
+            divDropdown.appendChild(divDropdownDiv);
+            div.appendChild(paragraph);
+            div.appendChild(divDropdown);
+            secondDiv.appendChild(div);
+        }
+
+        $(function() {
+
+            $('input[name="datefilter"]').daterangepicker({
+                autoUpdateInput: false,
+                locale: {
+                    cancelLabel: 'Clear'
+                }
+            });
+
+            $('input[name="datefilter"]').on('cancel.daterangepicker', function(ev, picker) {
+                $(this).val('');
+            });
+
+        });
+    }
+
+    function updateDataForStage(data, stage) {
+        data.amountOfGroupsDropdownMenu = document.querySelector('.' + stage + 'AmountOfGroupsDropdownMenu');
+        data.amountOfGroupsDropdownItem = document.getElementsByClassName(stage + 'AmountOfGroupsDropdownItem');
+        data.amountOfGroupsButton = document.querySelector('.' + stage + 'AmountOfGroupsButton');
+        data.amountOfInvitesInGroupDropdownMenu = document.querySelector('.' + stage + 'AmountOfInvitesInGroupDropdownMenu');
+        data.amountOfInvitesInGroupDropdownItem = document.getElementsByClassName(stage + 'AmountOfInvitesInGroupDropdownItem');
+        data.amountOfInvitesInGroupButton = document.querySelector('.' + stage + 'AmountOfInvitesInGroupButton');
+        data.passToNextStageDropdownMenu = document.querySelector('.' + stage + 'PassToNextStageDropdownMenu');
+        data.passToNextStageDropdownItem = document.getElementsByClassName(stage + 'PassToNextStageDropdownItem');
+        data.passToNextStageButton = document.querySelector('.' + stage + 'PassToNextStageButton');
+        data.datePickerInput = document.querySelector(`input[class="${stage}DatePickerInput"]`);
+        data.amountOfSessionsInOneDayDropdownMenu = document.querySelector('.' + stage + 'AmountOfSessionsInOneDayDropdownMenu');
+        data.amountOfSessionsInOneDayDropdownItem = document.getElementsByClassName(stage + 'AmountOfSessionsInOneDayDropdownItem');
+        data.amountOfSessionsInOneDayButton = document.querySelector('.' + stage + 'AmountOfSessionsInOneDayButton');
+        data.mainRowForSettings = document.getElementById(stage + 'MainRowForSettings')
+        currentStageData = data
+    }
+
+    <!-- Количество групп -->
+    function amountOfGroupsDropdownMenuCalculateAndPasteValues(previousStageData, currentStageData, stage) {
+        let { amountOfGroups, passToNextStage } = previousStageData;
+        let { amountOfGroupsDropdownMenu } = currentStageData;
+        let minValueAmountOfGroups = 0;
+        let maxValueAmountOfGroups = amountOfGroups / 2;
+
+        switch (generalData.amountOfMembersInTeam) {
+            case "Solo":
+                minValueAmountOfGroups = Math.ceil(amountOfGroups * passToNextStage / 64);
+                break
+            case "Duo":
+                minValueAmountOfGroups = Math.ceil(amountOfGroups * passToNextStage / 32);
+                break
+            case "Squad":
+                minValueAmountOfGroups = Math.ceil(amountOfGroups * passToNextStage / 16);
+                break
+        }
+
+        if (minValueAmountOfGroups > maxValueAmountOfGroups) {
+            const temp = minValueAmountOfGroups;
+            minValueAmountOfGroups = maxValueAmountOfGroups;
+            maxValueAmountOfGroups = temp
+        }
+
+        for (let i = minValueAmountOfGroups; i <= maxValueAmountOfGroups; i++) {
+            var newElement = document.createElement('a');
+            newElement.classList.add('dropdown-item');
+            newElement.classList.add(stage + 'AmountOfGroupsDropdownItem');
+            newElement.href = '#';
+            newElement.setAttribute('data-value', i);
+            newElement.textContent = i;
+            amountOfGroupsDropdownMenu.appendChild(newElement);
+        }
+        $('.dropdown-item').click(function() {
+            var value = $(this).data('value');
+            $(this).closest('.dropdown').find('.dropdown-toggle').html(value);
+        });
+        amountOfGroupsDropdownItemAddEventListener(currentStageData)
+    }
+
+    function amountOfGroupsDropdownItemAddEventListener(data) {
+        let { amountOfGroupsDropdownItem, amountOfGroupsButton, amountOfInvitesInGroupButton } = data;
+        for (let i = 0; i < amountOfGroupsDropdownItem.length; i++) {
+            amountOfGroupsDropdownItem[i].addEventListener('click', function() {
+                const selectedValue = this.getAttribute('data-value');
+                data.amountOfGroups = selectedValue
+                amountOfGroupsButton.setAttribute('disabled', 'disabled')
+                amountOfInvitesInGroupButton.removeAttribute('disabled')
+                amountOfInvitesInGroupDropdownMenuCalculateAndPasteValues(previousStageData, currentStageData, currentStageName)
+            });
+        }
+    }
+
+    <!-- Количество инвайтов в одной группе -->
+    function amountOfInvitesInGroupDropdownMenuCalculateAndPasteValues(previousStageData, currentStageData, stage) {
+        let { passToNextStage } = previousStageData;
+        let { amountOfGroups, amountOfInvitesInGroupDropdownMenu } = currentStageData;
+        let minValueAmountOfInvitesInGroup = 0;
+
+        let maxValueAmountOfInvitesInGroup = (amountOfGroups * generalData.maxAmountOfTeamsInGroup - previousStageData.amountOfGroups * passToNextStage) / amountOfGroups;
+
+        if (maxValueAmountOfInvitesInGroup >= 0) {
+            minValueAmountOfInvitesInGroup = 1;
+        }
+
+        for (let i = minValueAmountOfInvitesInGroup; i <= maxValueAmountOfInvitesInGroup; i++) {
+            var newElement = document.createElement('a');
+            newElement.classList.add('dropdown-item');
+            newElement.classList.add(stage + 'AmountOfInvitesInGroupDropdownItem');
+            newElement.href = '#';
+            newElement.setAttribute('data-value', i);
+            newElement.textContent = i;
+            amountOfInvitesInGroupDropdownMenu.appendChild(newElement);
+        }
+        $('.dropdown-item').click(function() {
+            var value = $(this).data('value');
+            $(this).closest('.dropdown').find('.dropdown-toggle').html(value);
+        });
+        amountOfInvitesInGroupDropdownItemAddEventListener(currentStageData)
+    }
+
+    function amountOfInvitesInGroupDropdownItemAddEventListener(data) {
+        let { amountOfInvitesInGroupDropdownItem, amountOfInvitesInGroupButton, passToNextStageButton } = data;
+        for (let i = 0; i < amountOfInvitesInGroupDropdownItem.length; i++) {
+            amountOfInvitesInGroupDropdownItem[i].addEventListener('click', function() {
+                const selectedValue = this.getAttribute('data-value');
+                data.amountOfInvitesInGroup = selectedValue;
+                data.amountOfVIPSlots = generalData.maxAmountOfTeamsInGroup - selectedValue;
+                amountOfInvitesInGroupButton.setAttribute('disabled', 'disabled')
+                passToNextStageButton.removeAttribute('disabled')
+                passToNextStageDropdownMenuCalculateAndPasteValues(currentStageData, currentStageName)
+            });
+        }
+    }
+
+    <!-- Проход в следующую стадию -->
+    function passToNextStageDropdownMenuCalculateAndPasteValues(data, stage) {
+        let { passToNextStageDropdownMenu } = data;
+        const minValue = 1;
+        const maxValue = generalData.maxAmountOfTeamsInGroup / 2;
+
+        for (let i = minValue; i <= maxValue; i++) {
+            var newElement = document.createElement('a');
+            newElement.classList.add('dropdown-item');
+            newElement.classList.add(stage + 'PassToNextStageDropdownItem');
+            newElement.href = '#';
+            newElement.setAttribute('data-value', i);
+            newElement.textContent = i;
+            passToNextStageDropdownMenu.appendChild(newElement);
+        }
+        $('.dropdown-item').click(function() {
+            var value = $(this).data('value');
+            $(this).closest('.dropdown').find('.dropdown-toggle').html(value);
+        });
+        passToNextStageDropdownItemAddEventListener(currentStageData)
+    }
+
+    function passToNextStageDropdownItemAddEventListener(data) {
+        let { passToNextStageDropdownItem, passToNextStageButton, datePickerInput } = data;
+        for (let i = 0; i < passToNextStageDropdownItem.length; i++) {
+            passToNextStageDropdownItem[i].addEventListener('click', function() {
+                const selectedValue = this.getAttribute('data-value');
+                data.passToNextStage = selectedValue
+                passToNextStageButton.setAttribute('disabled', 'disabled')
+                datePickerInput.removeAttribute('disabled')
+                calendarSetUp()
+            });
+        }
+    }
+
+    <!-- Календарь -->
+    function calendarSetUp() {
+        $(function() {
+            const dynamicClass = currentStageName + 'DatePickerInput';
+            $('input[class="' + dynamicClass + '"]').on('apply.daterangepicker', function(ev, picker) {
+                $(this).val(picker.startDate.format('DD/MM/YYYY') + ' - ' + picker.endDate.format('DD/MM/YYYY'));
+                currentStageData.startDateForStageTimestamp = picker.startDate;
+                currentStageData.endDateForStageTimestamp = picker.endDate + 1;
+                currentStageData.amountOfDaysForStage = calculateAmountOfDaysBetweenTwoTimestamps(picker.startDate, picker.endDate + 1);
+                amountOfSessionsInOneDayCalculateAndPasteValues(currentStageData, currentStageName)
+            });
+        });
+    }
+
+    <!-- Количество сессий в один день -->
+    function amountOfSessionsInOneDayCalculateAndPasteValues(data, stage) {
+        let { amountOfGroups, amountOfDaysForStage, datePickerInput, amountOfSessionsInOneDayButton, amountOfSessionsInOneDayDropdownMenu, amountOfSessionsInOneDay} = data;
+
+        if (amountOfGroups % amountOfDaysForStage == 0) {
+            data.amountOfSessionsInOneDay = amountOfGroups / amountOfDaysForStage
+
+            datePickerInput.setAttribute('disabled', 'disabled')
+            amountOfSessionsInOneDayButton.removeAttribute('disabled')
+
+            amountOfSessionsInOneDayDropdownMenu.innerHTML = '';
+            var newElement = document.createElement('a');
+            newElement.classList.add('dropdown-item');
+            newElement.classList.add(stage + 'AmountOfSessionsInOneDayDropdownItem');
+            newElement.href = '#';
+            newElement.setAttribute('data-value', data.amountOfSessionsInOneDay);
+            newElement.textContent = data.amountOfSessionsInOneDay;
+            amountOfSessionsInOneDayDropdownMenu.appendChild(newElement);
+
+            $('.dropdown-item').click(function() {
+                var value = $(this).data('value');
+                $(this).closest('.dropdown').find('.dropdown-toggle').html(value);
+            });
+            amountOfSessionsInOneDayEventListener(currentStageData)
+        } else {
+            console.log('Перевыберите даты проведения 1/4, т.к. платформа не может работать с таким количеством групп и датами')
+            //   Здесь нужно вывести Toast с текстом из консоли. Я не смог его реализовать
+        }
+    }
+
+    function amountOfSessionsInOneDayEventListener(data) {
+        let { amountOfSessionsInOneDayDropdownItem, amountOfSessionsInOneDayButton } = data;
+        for (let i = 0; i < amountOfSessionsInOneDayDropdownItem.length; i++) {
+            amountOfSessionsInOneDayDropdownItem[i].addEventListener('click', function() {
+                const selectedValue = this.getAttribute('data-value');
+                data.amountOfSessionsInOneDay = selectedValue
+                amountOfSessionsInOneDayButton.setAttribute('disabled', 'disabled')
+                createAndInsertSelectionOfTime(currentStageData, currentStageName)
+            });
+        }
+    }
+
+    <!-- Создание div'ов для выбора времени исходя из количества игровых дней -->
+    function createAndInsertSelectionOfTime(data, stage) {
+        let { amountOfGroups, amountOfDaysForStage, amountOfSessionsInOneDay, mainRowForSettings, timeOfSessionsDictionary } = data;
+
+        if (amountOfGroups != amountOfDaysForStage) {
+            for (let i = 1; i <= amountOfSessionsInOneDay; i++) {
+                createDivForSelectionTimeInSession(stage + 'TimeOfSessions', 'Время ' + i + ' игровой сессии', mainRowForSettings, i, data.timeOfSessionsDictionary)
+            }
+        } else {
+            for (let i = 1; i <= amountOfGroups; i++) {
+                createDivForSelectionTimeInSession(stage + 'TimeOfSessions', 'Время ' + i + ' игрового дня', mainRowForSettings, i, data.timeOfSessionsDictionary)
+            }
+        }
+        $('.dropdown-item').click(function() {
+            var value = $(this).data('value');
+            $(this).closest('.dropdown').find('.dropdown-toggle').html(value);
+        });
+    }
+
+    <!-- Настройка календаря для всей страницы -->
+    $(function() {
+
+        $('input[name="datefilter"]').daterangepicker({
+            autoUpdateInput: false,
+            locale: {
+                cancelLabel: 'Clear'
+            }
+        });
+
+        $('input[name="datefilter"]').on('cancel.daterangepicker', function(ev, picker) {
+            $(this).val('');
+        });
+
+    });
+
+    <!-- Подсчет количества дней между двумя датами в формате Timestamp -->
+    function calculateAmountOfDaysBetweenTwoTimestamps(start,end) {
+        var difference = end - start;
+
+        var daysDifference = Math.floor(difference/1000/60/60/24);
+        difference -= daysDifference*1000*60*60*24
+
+        var hoursDifference = Math.floor(difference/1000/60/60);
+        difference -= hoursDifference*1000*60*60
+
+        var minutesDifference = Math.floor(difference/1000/60);
+        difference -= minutesDifference*1000*60
+
+        var secondsDifference = Math.floor(difference/1000);
+
+        // console.log('difference = ' +
+        //     daysDifference + ' day/s ' +
+        //     hoursDifference + ' hour/s ' +
+        //     minutesDifference + ' minute/s ' +
+        //     secondsDifference + ' second/s ');
+
+        return daysDifference
+    }
+
+    <!-- Создание выпадающего меню для выбора времени сессии и определение выбора времени каждой сессии -->
+    function createDivForSelectionTimeInSession(className, textContent, documentForAppend, i, dictionaryForTime) {
+        var newDiv = document.createElement('div');
+        newDiv.className = 'row align-items-baseline';
+
+        var newParagpaph = document.createElement('p');
+        newParagpaph.textContent = textContent + ': ';
+
+        var newDropdown = document.createElement('div');
+        newDropdown.className = 'dropdown';
+
+        var newButton = document.createElement('button');
+        var newClassForButton = className + i + 'Button'
+        newButton.className = 'btn btn-primary dropdown-toggle ' + newClassForButton;
+        newButton.type = 'button';
+        newButton.setAttribute('data-toggle', 'dropdown');
+
+        var newDropdownMenu = document.createElement('div');
+        newDropdownMenu.className = 'dropdown-menu';
+
+        var times = ['00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
+
+        times.forEach(function(time) {
+            var newLink = document.createElement('a');
+            let newClassForDropdownItem = className + i + 'DropdownItem'
+            newLink.className = 'dropdown-item ' + newClassForDropdownItem;
+            newLink.href = '#';
+            newLink.setAttribute('data-value', time);
+            newLink.textContent = time;
+
+            <!-- Определение выбора времени каждой сессии -->
+            newLink.addEventListener('click', function(event) {
+                var selectedValue = event.target.getAttribute('data-value');
+                dictionaryForTime[i] = selectedValue
+                const test = document.querySelector('.' + newClassForButton)
+                test.setAttribute('disabled', 'disabled')
+                if (Object.keys(dictionaryForTime).length == currentStageData.amountOfSessionsInOneDay) {
+                    stages.shift()
+                    if (stages.length > 0) {
+                        switch (currentStageName) {
+                            case 'oneEight':
+                                oneEightData, previousStageData = currentStageData
+                                break
+                            case 'quarterfinal':
+                                quarterfinalData, previousStageData = currentStageData
+                                break
+                            case 'semifinal':
+                                semifinalData, previousStageData = currentStageData
+                                break
+                            case 'final':
+                                finalData, previousStageData = currentStageData
+                                break
+                            case 'grandfinal':
+                                grandfinalData, previousStageData = currentStageData
+                                break
+                        }
+
+                        switch (stages[0]) {
+                            case 'quarterfinal':
+                                currentStageData = quarterfinalData;
+                                currentStageName = 'quarterfinal';
+                                createSectionOfStage('Настройка 1/4 стадии:', previousStageData, currentStageData, 'quarterfinal', true);
+                                break
+                            case 'semifinal':
+                                currentStageData = semifinalData;
+                                currentStageName = 'semifinal';
+                                createSectionOfStage('Настройка 1/2 стадии:', previousStageData, currentStageData, 'semifinal', true);
+                                break
+                            case 'final':
+                                currentStageData = finalData;
+                                currentStageName = 'final';
+                                createSectionOfStage('Настройка финальной стадии:', previousStageData, currentStageData, 'final', true);
+                                break
+                            case 'grandfinal':
+                                currentStageData = grandfinalData;
+                                currentStageName = 'grandfinal';
+                                createSectionOfStage('Настройка гранд финальной стадии:', previousStageData, currentStageData, 'grandfinal', true);
+                                break
+                        }
+
+                        console.log('Лицо: ' + generalData.face + '\n' +
+                            'Количество игроков в 1 команде: ' + generalData.amountOfMembersInTeam + '\n' +
+                            'Режим: ' + generalData.mode + '\n' +
+                            'Общее количество команд: ' + generalData.amountOfTeams + '\n' +
+                            '1/8' + '\n' +
+                            'Количество групп: ' + oneEightData.amountOfGroups + '\n' +
+                            'Проход в следующую стадию: ' + oneEightData.passToNextStage + '\n' +
+                            'Даты проведения этапа: ' + oneEightData.amountOfDaysForStage + '\n' +
+                            'Количество игровых сессий в один день: ' + oneEightData.amountOfSessionsInOneDay + '\n' +
+                            'Время игровых сессий: ' + oneEightData.timeOfSessionsDictionary + '\n' +
+                            '1/4' + '\n' +
+                            'Количество групп: ' + quarterfinalData.amountOfGroups + '\n' +
+                            'Количество инвайтов в одной группе' + quarterfinalData.amountOfInvitesInGroup + '\n' +
+                            'Проход в следующую стадию: ' + quarterfinalData.passToNextStage + '\n' +
+                            'Даты проведения этапа: ' + quarterfinalData.amountOfDaysForStage + '\n' +
+                            'Количество игровых сессий в один день: ' + quarterfinalData.amountOfSessionsInOneDay + '\n' +
+                            'Время игровых сессий: ' + quarterfinalData.timeOfSessionsDictionary + '\n' +
+                            '1/2' + '\n' +
+                            'Количество групп: ' + semifinalData.amountOfGroups + '\n' +
+                            'Количество инвайтов в одной группе' + semifinalData.amountOfInvitesInGroup + '\n' +
+                            'Проход в следующую стадию: ' + semifinalData.passToNextStage + '\n' +
+                            'Даты проведения этапа: ' + semifinalData.amountOfDaysForStage + '\n' +
+                            'Количество игровых сессий в один день: ' + semifinalData.amountOfSessionsInOneDay + '\n' +
+                            'Время игровых сессий: ' + semifinalData.timeOfSessionsDictionary + '\n' +
+                            '1/1' + '\n' +
+                            'Количество групп: ' + finalData.amountOfGroups + '\n' +
+                            'Количество инвайтов в одной группе' + finalData.amountOfInvitesInGroup + '\n' +
+                            'Проход в следующую стадию: ' + finalData.passToNextStage + '\n' +
+                            'Даты проведения этапа: ' + finalData.amountOfDaysForStage + '\n' +
+                            'Количество игровых сессий в один день: ' + finalData.amountOfSessionsInOneDay + '\n' +
+                            'Время игровых сессий: ' + finalData.timeOfSessionsDictionary)
+                        amountOfGroupsDropdownMenuCalculateAndPasteValues(previousStageData, currentStageData, currentStageName);
+
+                    }
+                }
+            });
+
+            newDropdownMenu.appendChild(newLink);
+        });
+
+        newDiv.appendChild(newParagpaph)
+        newDiv.appendChild(newDropdown)
+        newDropdown.appendChild(newButton);
+        newDropdown.appendChild(newDropdownMenu);
+        documentForAppend.appendChild(newDiv)
+    }
+
+    <!-- Изменение валюты на кнопке при ее выборе -->
+    $(document).ready(function() {
+        $('.prizePoolCurrency').click(function(){
+            var selectedText = $(this).text();
+            $('.dropdownTogglePrizePoolCurrency').text(selectedText);
+        });
+    });
+
+</script>
+
+</body>
+</html>

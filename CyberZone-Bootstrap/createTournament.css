@@ -1,0 +1,27 @@
+.dropdown {
+    margin-left: 10px;
+    margin-right: 10px;
+    margin-bottom: 10px;
+}
+
+.tournament_name {
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.btn-warning {
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+h4 {
+    margin-top: 25px;
+    margin-bottom: 15px;
+    margin-left: 0px;
+}
+
+.form-check {
+    margin-left: 10px;
+    margin-top: 10px;
+    margin-bottom: 20px;
+}
