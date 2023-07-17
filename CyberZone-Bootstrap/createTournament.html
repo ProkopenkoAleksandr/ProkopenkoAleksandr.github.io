@@ -465,12 +465,10 @@
 
     function firstStageAmountOfFreeSlotsDropdownItemAddEventListener(data) {
         let { amountOfFreeSlotsDropdownItem, amountOfFreeSlotsButton, amountOfGroupsButton } = data;
-        console.log('After: ' + data.amountOfFreeSlotsDropdownMenu.outerHTML)
 
         for (let i = 0; i < amountOfFreeSlotsDropdownItem.length; i++) {
             amountOfFreeSlotsDropdownItem[i].addEventListener('click', function() {
                 const selectedValue = this.getAttribute('data-value');
-                console.log('Selected value: ' + selectedValue)
                 data.amountOfFreeSlots = selectedValue
                 amountOfFreeSlotsButton.setAttribute('disabled', 'disabled')
                 amountOfGroupsButton.removeAttribute('disabled')
@@ -588,6 +586,7 @@
             firstStageAmountOfDaysForStageEventListener(data)
         } else {
             console.log('Перевыберите даты проведения 1/8, т.к. платформа не может работать с таким количеством групп и датами')
+            //   Здесь нужно вывести Toast с текстом из консоли. Я не смог его реализовать
         }
     }
 
