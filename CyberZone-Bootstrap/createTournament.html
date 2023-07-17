@@ -11,11 +11,10 @@
     <script type="text/javascript" src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css"/>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Cоздание турнира</title>
 </head>
 <body>
-
 
 <!-- Текст. Основные настройки турнира-->
 <div class="row">
@@ -151,10 +150,11 @@
         </div>
 
     </div>
+
 </div>
 
 <div class="d-flex justify-content-center">
-    <button type="button" class="col-md-2 btn btn-warning" id="generalSaveButton" disabled>Сохранить</button>
+    <button type="button" class="col-8 col-md-6 btn btn-warning" id="generalSaveButton" disabled>Сохранить</button>
 </div>
 
 <script>
@@ -180,6 +180,10 @@
 
     let oneEightData = {
         stage: "oneEight",
+        amountOfFreeSlots: 0,
+        amountOfFreeSlotsDropdownMenu: document.querySelector('.oneEightAmountOfFreeSlotsDropdownMenu'),
+        amountOfFreeSlotsDropdownItem: document.getElementsByClassName('oneEightAmountOfFreeSlotsDropdownItem'),
+        amountOfFreeSlotsButton: document.querySelector('.oneEightAmountOfFreeSlotsButton'),
         amountOfGroups: 0,
         amountOfGroupsDropdownMenu: document.querySelector('.oneEightAmountOfGroupsDropdownMenu'),
         amountOfGroupsDropdownItem: document.getElementsByClassName('oneEightAmountOfGroupsDropdownItem'),
@@ -204,6 +208,10 @@
 
     let quarterfinalData = {
         stage: "quarterfinal",
+        amountOfFreeSlots: 0,
+        amountOfFreeSlotsDropdownMenu: document.querySelector('.quarterfinalAmountOfFreeSlotsDropdownMenu'),
+        amountOfFreeSlotsDropdownItem: document.getElementsByClassName('quarterfinalAmountOfFreeSlotsDropdownItem'),
+        amountOfFreeSlotsButton: document.querySelector('.quarterfinalAmountOfFreeSlotsButton'),
         amountOfGroups: 0,
         amountOfGroupsDropdownMenu: document.querySelector('.quarterfinalAmountOfGroupsDropdownMenu'),
         amountOfGroupsDropdownItem: document.getElementsByClassName('quarterfinalAmountOfGroupsDropdownItem'),
@@ -231,6 +239,9 @@
 
     let semifinalData = {
         stage: "semifinal",
+        amountOfFreeSlotsDropdownMenu: document.querySelector('.semifinalAmountOfFreeSlotsDropdownMenu'),
+        amountOfFreeSlotsDropdownItem: document.getElementsByClassName('semifinalAmountOfFreeSlotsDropdownItem'),
+        amountOfFreeSlotsButton: document.querySelector('.semifinalAmountOfFreeSlotsButton'),
         amountOfGroups: 0,
         amountOfGroupsDropdownMenu: document.querySelector('.semifinalAmountOfGroupsDropdownMenu'),
         amountOfGroupsDropdownItem: document.getElementsByClassName('semifinalAmountOfGroupsDropdownItem'),
@@ -258,6 +269,9 @@
 
     let finalData = {
         stage: "final",
+        amountOfFreeSlotsDropdownMenu: document.querySelector('.finalAmountOfFreeSlotsDropdownMenu'),
+        amountOfFreeSlotsDropdownItem: document.getElementsByClassName('finalAmountOfFreeSlotsDropdownItem'),
+        amountOfFreeSlotsButton: document.querySelector('.finalAmountOfFreeSlotsButton'),
         amountOfGroups: 0,
         amountOfGroupsDropdownMenu: document.querySelector('.finalAmountOfGroupsDropdownMenu'),
         amountOfGroupsDropdownItem: document.getElementsByClassName('finalAmountOfGroupsDropdownItem'),
@@ -285,6 +299,9 @@
 
     let grandfinalData = {
         stage: "grandfinal",
+        amountOfFreeSlotsDropdownMenu: document.querySelector('.grandfinalAmountOfFreeSlotsDropdownMenu'),
+        amountOfFreeSlotsDropdownItem: document.getElementsByClassName('grandfinalAmountOfFreeSlotsDropdownItem'),
+        amountOfFreeSlotsButton: document.querySelector('.grandfinalAmountOfFreeSlotsButton'),
         amountOfGroups: 0,
         amountOfGroupsDropdownMenu: document.querySelector('.grandfinalAmountOfGroupsDropdownMenu'),
         amountOfGroupsDropdownItem: document.getElementsByClassName('grandfinalAmountOfGroupsDropdownItem'),
@@ -345,6 +362,7 @@
         });
     }
 
+    <!-- Подсчет минимального и максимального количества команд в группе -->
     function caclulateMinAndMaxAmountOfTeamsInGroup() {
         switch (generalData.amountOfMembersInTeam) {
             case "Solo":
@@ -395,54 +413,93 @@
         switch (stages[0]) {
             case 'oneEight':
                 currentStageName = 'oneEight'
-                createSectionOfStage('Настройка 1/8 стадии:', null, oneEightData, 'oneEight', false)
-                firstStageAmountOfGroupsCalculateAndPasteValues(currentStageData)
+                createSectionOfStage('Настройка 1/8 стадии:', null, oneEightData, 'oneEight', false, true)
+                break
+            case 'quarterfinal':
+                currentStageName = 'quarterfinal'
+                createSectionOfStage('Настройка 1/4 стадии:', null, quarterfinalData, 'quarterfinal', false, true)
+                break
+            case 'semifinal':
+                currentStageName = 'semifinal'
+                createSectionOfStage('Настройка 1/2 стадии:', null, semifinalData, 'semifinal', false, true)
+                break
+            case 'final':
+                currentStageName = 'final'
+                createSectionOfStage('Настройка финальной стадии:', null, finalData, 'final', false, true)
+                break
+            case 'grandfinal':
+                currentStageName = 'grandfinal'
+                createSectionOfStage('Настройка гранд - финальной стадии:', null, grandfinalData, 'final', false, true)
                 break
         }
+        firstStageAmountOfFreeSlotsDropdownMenuCalculateAndPasteValues(currentStageData)
+        generalData.saveButton.setAttribute('disabled', 'disabled')
 
     });
 
-    <!-- Количество групп -->
-    function firstStageAmountOfGroupsCalculateAndPasteValues(data) {
-        data.amountOfGroupsButton.removeAttribute('disabled')
+    <!-- Количество бесплатных слотов -->
+    function firstStageAmountOfFreeSlotsDropdownMenuCalculateAndPasteValues(data) {
+        data.amountOfFreeSlotsButton.removeAttribute('disabled')
 
-        let { amountOfGroupsDropdownMenu } = data;
-        amountOfGroupsDropdownMenu.innerHTML = '';
+        let { amountOfFreeSlotsDropdownMenu } = data;
+        amountOfFreeSlotsDropdownMenu.innerHTML = '';
 
-        let minAmountOfGroups = 0;
-        let maxAmountOfGroups = 0;
-        switch (generalData.amountOfMembersInTeam) {
-            case "Solo":
-                minAmountOfGroups = Math.ceil(generalData.amountOfTeams / 100);
-                maxAmountOfGroups = Math.ceil(generalData.amountOfTeams / 64);
-                break
-            case "Duo":
-                minAmountOfGroups = Math.ceil(generalData.amountOfTeams / 50);
-                maxAmountOfGroups = Math.ceil(generalData.amountOfTeams / 32);
-                break
-            case "Squad":
-                minAmountOfGroups = Math.ceil(generalData.amountOfTeams / 25);
-                maxAmountOfGroups = Math.ceil(generalData.amountOfTeams / 16);
-                break
-        }
-
-        for (var i = minAmountOfGroups; i <= maxAmountOfGroups; i++) {
+        for (var i = 1; i <= generalData.maxAmountOfTeamsInGroup; i++) {
             var newElement = document.createElement('a');
             newElement.classList.add('dropdown-item');
-            newElement.classList.add(currentStageName + 'AmountOfGroupsDropdownItem');
+            newElement.classList.add(currentStageName + 'AmountOfFreeSlotsDropdownItem');
             newElement.href = '#';
             newElement.setAttribute('data-value', i);
             newElement.textContent = i;
-            if (i % 2 == 0) {
-                amountOfGroupsDropdownMenu.appendChild(newElement);
+            if (generalData.amountOfTeams % i === 0) {
+                amountOfFreeSlotsDropdownMenu.appendChild(newElement);
             }
         }
 
         $('.dropdown-item').click(function() {
             var value = $(this).data('value');
             $(this).closest('.dropdown').find('.dropdown-toggle').html(value);
-            firstStageAmountOfGroupsEventListener(data)
         });
+        firstStageAmountOfFreeSlotsDropdownItemAddEventListener(data)
+    }
+
+    function firstStageAmountOfFreeSlotsDropdownItemAddEventListener(data) {
+        let { amountOfFreeSlotsDropdownItem, amountOfFreeSlotsButton, amountOfGroupsButton } = data;
+        console.log('After: ' + data.amountOfFreeSlotsDropdownMenu.outerHTML)
+
+        for (let i = 0; i < amountOfFreeSlotsDropdownItem.length; i++) {
+            amountOfFreeSlotsDropdownItem[i].addEventListener('click', function() {
+                const selectedValue = this.getAttribute('data-value');
+                console.log('Selected value: ' + selectedValue)
+                data.amountOfFreeSlots = selectedValue
+                amountOfFreeSlotsButton.setAttribute('disabled', 'disabled')
+                amountOfGroupsButton.removeAttribute('disabled')
+                firstStageAmountOfGroupsCalculateAndPasteValues(data)
+            });
+        }
+    }
+
+    <!-- Количество групп -->
+    function firstStageAmountOfGroupsCalculateAndPasteValues(data) {
+        let { amountOfGroupsDropdownMenu } = data;
+
+        amountOfGroupsDropdownMenu.innerHTML = '';
+
+        const value = generalData.amountOfTeams / data.amountOfFreeSlots
+
+        var newElement = document.createElement('a');
+        newElement.classList.add('dropdown-item');
+        newElement.classList.add(currentStageName + 'AmountOfGroupsDropdownItem');
+        newElement.href = '#';
+        newElement.setAttribute('data-value', value);
+        newElement.textContent = value;
+        amountOfGroupsDropdownMenu.appendChild(newElement)
+
+        $('.dropdown-item').click(function() {
+            var value = $(this).data('value');
+            $(this).closest('.dropdown').find('.dropdown-toggle').html(value);
+        });
+        firstStageAmountOfGroupsEventListener(data)
     }
 
     function firstStageAmountOfGroupsEventListener(data) {
@@ -531,7 +588,6 @@
             firstStageAmountOfDaysForStageEventListener(data)
         } else {
             console.log('Перевыберите даты проведения 1/8, т.к. платформа не может работать с таким количеством групп и датами')
-            //   Здесь нужно вывести Toast с текстом из консоли. Я не смог его реализовать
         }
     }
 
@@ -567,9 +623,10 @@
         });
     }
 
-    function createSectionOfStage(title, previousStageData, currentStageData, stageName, invites) {
+    <!-- Создание секций для каждой стадии -->
+    function createSectionOfStage(title, previousStageData, currentStageData, stageName, invites, freeSlots = false) {
         createTitleOfSection(title);
-        createDiv(stageName, invites);
+        createDiv(stageName, invites, freeSlots);
         updateDataForStage(currentStageData, stageName);
     }
 
@@ -596,7 +653,7 @@
         document.body.appendChild(rowElement);
     }
 
-    function createDiv(stage, invites) {
+    function createDiv(stage, invites, amountOfFreeSlots) {
         const rowElement = document.createElement('div');
         rowElement.className = 'row';
 
@@ -625,7 +682,10 @@
         thirdDiv.className = 'col-2 col-md-3';
 
         rowElement.appendChild(firstDiv);
-        createElementForSecondDiv('Количество групп: ', stage, 'AmountOfGroups', false);
+        if (amountOfFreeSlots == true) {
+            createElementForSecondDiv('Количество бесплатных слотов в одной группе: ', stage, 'AmountOfFreeSlots', false);
+        }
+        createElementForSecondDiv('Количество групп: ', stage, 'AmountOfGroups');
         if (invites == true) {
             createElementForSecondDiv('Количество инвайтов в одной группе: ', stage, 'AmountOfInvitesInGroup');
         }
@@ -683,6 +743,9 @@
     }
 
     function updateDataForStage(data, stage) {
+        data.amountOfFreeSlotsDropdownMenu = document.querySelector('.' + stage + 'AmountOfFreeSlotsDropdownMenu');
+        data.amountOfFreeSlotsDropdownItem = document.getElementsByClassName(stage + 'AmountOfFreeSlotsDropdownItem');
+        data.amountOfFreeSlotsButton = document.querySelector('.' + stage + 'AmountOfFreeSlotsButton');
         data.amountOfGroupsDropdownMenu = document.querySelector('.' + stage + 'AmountOfGroupsDropdownMenu');
         data.amountOfGroupsDropdownItem = document.getElementsByClassName(stage + 'AmountOfGroupsDropdownItem');
         data.amountOfGroupsButton = document.querySelector('.' + stage + 'AmountOfGroupsButton');
@@ -702,10 +765,11 @@
 
     <!-- Количество групп -->
     function amountOfGroupsDropdownMenuCalculateAndPasteValues(previousStageData, currentStageData, stage) {
+        currentStageData.amountOfGroupsButton.removeAttribute('disabled');
         let { amountOfGroups, passToNextStage } = previousStageData;
         let { amountOfGroupsDropdownMenu } = currentStageData;
         let minValueAmountOfGroups = 0;
-        let maxValueAmountOfGroups = amountOfGroups / 2;
+        let maxValueAmountOfGroups = Math.ceil(amountOfGroups / 2);
 
         switch (generalData.amountOfMembersInTeam) {
             case "Solo":
@@ -1080,6 +1144,7 @@
             $('.dropdownTogglePrizePoolCurrency').text(selectedText);
         });
     });
+
 
 </script>
 
