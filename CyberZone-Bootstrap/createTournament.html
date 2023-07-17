@@ -126,7 +126,7 @@
                 <button class="btn btn-primary dropdown-toggle generalModeButton" type="button" data-toggle="dropdown" disabled></button>
                 <div class="dropdown-menu">
                     <a class="dropdown-item generalModeDropdownItem" href="#" data-value="Классический">Классический</a>
-                    <a class="dropdown-item generalModeDropdownItem" href="#" data-value="TDM">TDM</a>
+                    <a class="dropdown-item generalModeDropdownItem disabled" href="#" data-value="TDM">TDM</a>
                 </div>
             </div>
         </div>
@@ -136,16 +136,7 @@
             <p>Общее количество команд:</p>
             <div class="dropdown">
                 <button class="btn btn-primary dropdown-toggle generalAmountOfTeamsButton" type="button" data-toggle="dropdown" disabled></button>
-                <div class="dropdown-menu">
-                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="64">64</a>
-                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="96">96</a>
-                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="128">128</a>
-                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="160">160</a>
-                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="192">192</a>
-                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="224">224</a>
-                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="256">256</a>
-                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="288">288</a>
-                    <a class="dropdown-item generalAmountOfTeamsDropdownItem" href="#" data-value="320">320</a>
+                <div class="dropdown-menu generalAmountOfTeamsDropdownMenu">
                 </div>
             </div>
         </div>
@@ -173,6 +164,7 @@
         modeDropdownItem: document.getElementsByClassName('generalModeDropdownItem'),
         modeButton: document.querySelector(".generalModeButton"),
         amountOfTeams: 0,
+        amountOfTeamsDropdownMenu: document.querySelector('.generalAmountOfTeamsDropdownMenu'),
         amountOfTeamsDropdownItem: document.getElementsByClassName('generalAmountOfTeamsDropdownItem'),
         amountOfTeamsButton: document.querySelector(".generalAmountOfTeamsButton"),
         сheckboxes: document.querySelectorAll('input[type="checkbox"]'),
@@ -334,6 +326,10 @@
     let currentStageData = {}
     let currentStageName = ''
 
+    const amountOfTeamsSolo = [64, 128, 256, 512];
+    const amountOfTeamsDuo = [60, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80];
+    const amountOfTeamsSquad = [64, 96, 128, 160, 192, 224, 256, 288, 320];
+
     <!-- Настройка выпадающего меню -->
     $(document).ready(function() {
         $('.dropdown-item').click(function() {
@@ -360,7 +356,40 @@
             generalData.amountOfMemberInTeamButton.setAttribute('disabled', 'disabled')
             generalData.modeButton.removeAttribute('disabled')
             caclulateMinAndMaxAmountOfTeamsInGroup()
+            generalAmountOfTeamsCalculateAndPasteValues()
         });
+    }
+
+    <!-- Заполнение значений для dropdown menu в общем количестве команд -->
+    function generalAmountOfTeamsCalculateAndPasteValues() {
+        generalData.amountOfTeamsDropdownMenu.innerHTML = '';
+
+        switch (generalData.amountOfMembersInTeam) {
+            case 'Solo':
+                appendItemsToDropdownMenu(amountOfTeamsSolo)
+                break
+            case 'Duo':
+                appendItemsToDropdownMenu(amountOfTeamsDuo)
+                break
+            case 'Squad':
+                appendItemsToDropdownMenu(amountOfTeamsSquad)
+                break
+        }
+        function appendItemsToDropdownMenu(arrayName) {
+            arrayName.forEach(function(element) {
+                var newElement = document.createElement('a');
+                newElement.classList.add('dropdown-item');
+                newElement.classList.add('generalAmountOfTeamsDropdownItem');
+                newElement.href = '#';
+                newElement.setAttribute('data-value', element);
+                newElement.textContent = element;
+                generalData.amountOfTeamsDropdownMenu.appendChild(newElement);
+            });
+            $('.dropdown-item').click(function() {
+                var value = $(this).data('value');
+                $(this).closest('.dropdown').find('.dropdown-toggle').html(value);
+            });
+        }
     }
 
     <!-- Подсчет минимального и максимального количества команд в группе -->
@@ -388,17 +417,20 @@
             generalData.mode = selectedValue
             generalData.modeButton.setAttribute('disabled', 'disabled')
             generalData.amountOfTeamsButton.removeAttribute('disabled')
+            generalAmountOfTeamsAddEventListener()
         });
     }
 
     <!-- Определение общего выбора количества команд -->
-    for (let i = 0; i < generalData.amountOfTeamsDropdownItem.length; i++) {
-        generalData.amountOfTeamsDropdownItem[i].addEventListener('click', function() {
-            const selectedValue = this.getAttribute('data-value');
-            generalData.amountOfTeams = selectedValue
-            generalData.amountOfTeamsButton.setAttribute('disabled', 'disabled')
-            generalData.saveButton.removeAttribute('disabled')
-        });
+    function generalAmountOfTeamsAddEventListener() {
+        for (let i = 0; i < generalData.amountOfTeamsDropdownItem.length; i++) {
+            generalData.amountOfTeamsDropdownItem[i].addEventListener('click', function() {
+                const selectedValue = this.getAttribute('data-value');
+                generalData.amountOfTeams = selectedValue
+                generalData.amountOfTeamsButton.setAttribute('disabled', 'disabled')
+                generalData.saveButton.removeAttribute('disabled')
+            });
+        }
     }
 
     <!-- Нажатие на кнопку сохранить в основных настройках -->
@@ -548,9 +580,10 @@
                 passToNextStageButton.setAttribute('disabled', 'disabled')
                 datePickerInput.removeAttribute('disabled');
                 <!-- Даты проведения этапа -->
-                $('input[class="oneEightDatePickerInput"]').on('apply.daterangepicker', function(ev, picker) {
+                const dynamicClass = currentStageName + 'DatePickerInput';
+                $('input[class="' + dynamicClass + '"]').on('apply.daterangepicker', function(ev, picker) {
                     $(this).val(picker.startDate.format('DD/MM/YYYY') + ' - ' + picker.endDate.format('DD/MM/YYYY'));
-                    firstStageAmountOfDaysForStageCalculateAndPasteValues(picker, currentStageData, 'oneEight')
+                    firstStageAmountOfDaysForStageCalculateAndPasteValues(picker, currentStageData, currentStageName)
                 });
             });
         }
@@ -598,7 +631,7 @@
                 const selectedValue = this.getAttribute('data-value');
                 data.amountOfSessionsInOneDay = selectedValue
                 amountOfSessionsInOneDayButton.setAttribute('disabled', 'disabled');
-                firstStageInsertionDivForChoosingTimeOfSession(data, 'oneEight');
+                firstStageInsertionDivForChoosingTimeOfSession(data, currentStageName);
             });
         }
     }
@@ -606,7 +639,7 @@
     <!-- Выбор времени для игровых сессий -->
     function firstStageInsertionDivForChoosingTimeOfSession(data, stage) {
         let { amountOfGroups, amountOfDaysForStage, amountOfSessionsInOneDay, timeOfSessionsDictionary } = data;
-        data.mainRowForSettings = document.getElementById('oneEightMainRowForSettings');
+        data.mainRowForSettings = document.getElementById(currentStageName + 'MainRowForSettings');
 
         if (amountOfGroups != amountOfDaysForStage) {
             for (let i = 1; i <= amountOfSessionsInOneDay; i++) {
@@ -1046,7 +1079,7 @@
                 dictionaryForTime[i] = selectedValue
                 const test = document.querySelector('.' + newClassForButton)
                 test.setAttribute('disabled', 'disabled')
-                if (Object.keys(dictionaryForTime).length == currentStageData.amountOfSessionsInOneDay) {
+                if ((Object.keys(dictionaryForTime).length == currentStageData.amountOfSessionsInOneDay && currentStageData.amountOfSessionsInOneDay != 1) || (Object.keys(dictionaryForTime).length == currentStageData.amountOfDaysForStage && currentStageData.amountOfSessionsInOneDay == 1)) {
                     stages.shift()
                     if (stages.length > 0) {
                         switch (currentStageName) {
@@ -1090,39 +1123,7 @@
                                 break
                         }
 
-                        console.log('Лицо: ' + generalData.face + '\n' +
-                            'Количество игроков в 1 команде: ' + generalData.amountOfMembersInTeam + '\n' +
-                            'Режим: ' + generalData.mode + '\n' +
-                            'Общее количество команд: ' + generalData.amountOfTeams + '\n' +
-                            '1/8' + '\n' +
-                            'Количество групп: ' + oneEightData.amountOfGroups + '\n' +
-                            'Проход в следующую стадию: ' + oneEightData.passToNextStage + '\n' +
-                            'Даты проведения этапа: ' + oneEightData.amountOfDaysForStage + '\n' +
-                            'Количество игровых сессий в один день: ' + oneEightData.amountOfSessionsInOneDay + '\n' +
-                            'Время игровых сессий: ' + oneEightData.timeOfSessionsDictionary + '\n' +
-                            '1/4' + '\n' +
-                            'Количество групп: ' + quarterfinalData.amountOfGroups + '\n' +
-                            'Количество инвайтов в одной группе' + quarterfinalData.amountOfInvitesInGroup + '\n' +
-                            'Проход в следующую стадию: ' + quarterfinalData.passToNextStage + '\n' +
-                            'Даты проведения этапа: ' + quarterfinalData.amountOfDaysForStage + '\n' +
-                            'Количество игровых сессий в один день: ' + quarterfinalData.amountOfSessionsInOneDay + '\n' +
-                            'Время игровых сессий: ' + quarterfinalData.timeOfSessionsDictionary + '\n' +
-                            '1/2' + '\n' +
-                            'Количество групп: ' + semifinalData.amountOfGroups + '\n' +
-                            'Количество инвайтов в одной группе' + semifinalData.amountOfInvitesInGroup + '\n' +
-                            'Проход в следующую стадию: ' + semifinalData.passToNextStage + '\n' +
-                            'Даты проведения этапа: ' + semifinalData.amountOfDaysForStage + '\n' +
-                            'Количество игровых сессий в один день: ' + semifinalData.amountOfSessionsInOneDay + '\n' +
-                            'Время игровых сессий: ' + semifinalData.timeOfSessionsDictionary + '\n' +
-                            '1/1' + '\n' +
-                            'Количество групп: ' + finalData.amountOfGroups + '\n' +
-                            'Количество инвайтов в одной группе' + finalData.amountOfInvitesInGroup + '\n' +
-                            'Проход в следующую стадию: ' + finalData.passToNextStage + '\n' +
-                            'Даты проведения этапа: ' + finalData.amountOfDaysForStage + '\n' +
-                            'Количество игровых сессий в один день: ' + finalData.amountOfSessionsInOneDay + '\n' +
-                            'Время игровых сессий: ' + finalData.timeOfSessionsDictionary)
                         amountOfGroupsDropdownMenuCalculateAndPasteValues(previousStageData, currentStageData, currentStageName);
-
                     }
                 }
             });
@@ -1144,7 +1145,6 @@
             $('.dropdownTogglePrizePoolCurrency').text(selectedText);
         });
     });
-
 
 </script>
 
