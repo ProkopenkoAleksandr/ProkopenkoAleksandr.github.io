@@ -37,7 +37,7 @@
         <!-- Ввод названия турнира -->
         <div class="row align-items-baseline">
             <div class="tournament_name input-group col-12 col-md-8">
-                <input type="text" class="form-control" placeholder="Введите название турнира" aria-label="Введите название турнира" aria-describedby="basic-addon1">
+                <input type="text" class="form-control titleOfTournamentInputType" placeholder="Введите название турнира" aria-label="Введите название турнира" aria-describedby="basic-addon1">
             </div>
         </div>
 
@@ -45,7 +45,7 @@
         <div class="row align-items-baseline d-flex">
             <p>Призовой фонд: </p>
             <div class="input-group mb-3 col-8">
-                <input type="text" class="form-control" aria-label="Text input with dropdown button" placeholder="Сумма">
+                <input type="text" class="form-control inputTypePrizePool" aria-label="Text input with dropdown button" placeholder="Сумма">
                 <div class="input-group-append">
                     <button class="btn btn-outline-secondary dropdown-toggle dropdownTogglePrizePoolCurrency" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Валюта</button>
                     <div class="dropdown-menu">
@@ -65,7 +65,7 @@
         <div class="row align-items-baseline mb-2">
             <div class="input-group">
                 <span class="input-group-text">Пруф линки:</span>
-                <textarea class="form-control" aria-label="With textarea"></textarea>
+                <textarea class="form-control textareaProofLinks" aria-label="With textarea"></textarea>
             </div>
         </div>
 
@@ -89,7 +89,7 @@
                 <label class="form-check-label" for="inlineCheckbox4">Финал</label>
             </div>
             <div class="form-check form-check-inline">
-                <input class="form-check-input" type="checkbox" id="inlineCheckbox5" value="grand-final">
+                <input class="form-check-input" type="checkbox" id="inlineCheckbox5" value="grandfinal">
                 <label class="form-check-label" for="inlineCheckbox5">Гранд-финал</label>
             </div>
         </div>
@@ -467,7 +467,18 @@
         }
         firstStageAmountOfFreeSlotsDropdownMenuCalculateAndPasteValues(currentStageData)
         generalData.saveButton.setAttribute('disabled', 'disabled')
-
+        
+        <!-- Блокируем поля вводов -->
+        document.querySelector('.titleOfTournamentInputType').setAttribute('disabled', 'disabled');
+        document.querySelector('.dropdownTogglePrizePoolCurrency').setAttribute('disabled', 'disabled');
+        document.querySelector('.inputTypePrizePool').setAttribute('disabled', 'disabled');
+        document.querySelector('.textareaProofLinks').setAttribute('disabled', 'disabled');
+        const formCheckInput = document.querySelectorAll('.form-check-input')
+        if (formCheckInput.length > 0) {
+            formCheckInput.forEach(function(element) {
+                element.setAttribute('disabled', 'disabled')
+            });
+        }
     });
 
     <!-- Количество бесплатных слотов -->
