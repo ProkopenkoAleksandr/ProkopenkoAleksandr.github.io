@@ -124,17 +124,28 @@ function gui.drawSearch(search_query, focused)
 end
 
 function gui.drawCategories(categories, active_cat)
-    local x = 2; local y = 6  -- +1 строка отступа от поиска
+    local startY = 6
+    local x = 2
+    local y = startY
+    local maxX = rightColX - 1   -- последний доступный X в левой колонке
     for i, cat in ipairs(categories) do
         local catW = unicode.len(cat) + 4
+        -- если кнопка не помещается на текущей строке — переносим (со строкой-разрывом для воздуха)
+        if x > 2 and (x + catW - 1) > maxX then
+            y = y + 2
+            x = 2
+        end
         local bg = (cat == active_cat) and gui.COLORS.btnActive or gui.COLORS.btn
         gui.btn("cat_"..cat, x, y, catW, 1, cat, bg)
         x = x + catW + 1
     end
+    gui.categoriesEndY = y  -- последняя использованная строка категорий
 end
 
 function gui.drawItems(pageItems, page, maxPage)
-    rect(1, 8, rightColX - 1, H - 7, gui.COLORS.bg)
+    -- старт сразу после категорий (+1 строка-разрыв для воздуха)
+    local startY = (gui.categoriesEndY or 6) + 2
+    rect(1, startY, rightColX - 1, H - startY - 1, gui.COLORS.bg)
     local margin = 2; local cols = 4;
     local tileW = math.floor((rightColX - (cols + 1) * margin) / cols); local tileH = 6
     local row, col = 0, 0
@@ -142,7 +153,7 @@ function gui.drawItems(pageItems, page, maxPage)
     for _, pItem in ipairs(pageItems) do
         local item = pItem.item
         local id = pItem.origIdx
-        local x = margin + col * (tileW + margin); local y = 8 + row * (tileH + 1)
+        local x = margin + col * (tileW + margin); local y = startY + row * (tileH + 1)
         
         rect(x, y, tileW, tileH, gui.COLORS.tileBg)
         center(x, y, tileW, item.name, gui.COLORS.text, gui.COLORS.tileHeader)
@@ -158,9 +169,11 @@ function gui.drawItems(pageItems, page, maxPage)
         col = col + 1; if col >= cols then col = 0; row = row + 1 end
     end
 
+    -- Пагинация. ВАЖНО: подпись «Страница X из Y» рисуем ПЕРВОЙ — она через center
+    -- делает gpu.fill по всей ширине строки и затирает кнопки, если рисовать её после них.
     local py = H - 3
-    if page > 1 then gui.btn("page_prev", 2, py, 14, 3, "<- НАЗАД", gui.COLORS.btnActive) end
     center(1, py + 1, rightColX - 1, "Страница " .. page .. " из " .. maxPage, gui.COLORS.text, gui.COLORS.bg)
+    if page > 1 then gui.btn("page_prev", 2, py, 14, 3, "<- НАЗАД", gui.COLORS.btnActive) end
     if page < maxPage then gui.btn("page_next", rightColX - 16, py, 14, 3, "ВПЕРЕД ->", gui.COLORS.btnActive) end
 end
 
