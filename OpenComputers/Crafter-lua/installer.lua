@@ -8,6 +8,7 @@ local files = {
     "config.lua",
     "network.lua",
     "json.lua",
+    "gui.lua",
     "crafter.lua"
 }
 

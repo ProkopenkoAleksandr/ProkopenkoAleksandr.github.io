@@ -1,13 +1,10 @@
 -- /lua/crafter.lua
--- Автоматическое пополнение МЭ-склада товарами магазина.
--- Раз в config.crafter_interval секунд:
---   1. Читает список товаров (через Firebase /shop, либо локальный /home/shop_data.json).
---   2. Через me_interface получает текущий stock каждого товара.
---   3. Если stock <= порога и нет активного crafting-job — заказывает крафт.
---   4. Логирует действия (локально и в Firebase /logs).
---
--- Можно запускать на отдельном OC-компьютере (нужны: internet card, me_interface).
--- Закрытие: Ctrl+Alt+C.
+-- GUI-приложение автокрафта МЭ-склада.
+-- - Раз в config.crafter_interval секунд читает /shop и пытается заказать крафт
+--   всех товаров, у которых stock <= порога.
+-- - Показывает все активные заказы, статус, возраст, кнопку отмены.
+-- - Кнопки: тик сейчас, пауза/авто, отменить всё, выход.
+-- Закрытие: [ВЫХОД] или Ctrl+Alt+C.
 
 local component = require("component")
 local event = require("event")
@@ -18,18 +15,40 @@ local computer = require("computer")
 local config = require("config")
 local network = require("network")
 local json = require("json")
+local gui = require("gui")
 
--- === Настройки (с дефолтами) ===
-local INTERVAL = tonumber(config.crafter_interval) or 300  -- сек между проходами
-local THRESHOLD = tonumber(config.crafter_threshold) or 0   -- заказывать если stock <= threshold
-local DEFAULT_AMOUNT = tonumber(config.crafter_amount) or 64  -- сколько штук в одном заказе
-local ENABLED = (config.crafter_enabled ~= false)            -- true по умолчанию
+event.shouldInterrupt = function() return false end
 
--- Активные крафтинги: key="id|damage" → CPU job
-local activeJobs = {}
+-- ===== Настройки =====
+local INTERVAL = tonumber(config.crafter_interval) or 300
+local THRESHOLD = tonumber(config.crafter_threshold) or 0
+local DEFAULT_AMOUNT = tonumber(config.crafter_amount) or 64
+local ENABLED_AT_START = (config.crafter_enabled ~= false)
+local maxConcurrent = tonumber(config.crafter_max_concurrent) or 2
+if maxConcurrent < 1 then maxConcurrent = 1 end
+
+-- ===== Состояние =====
+local activeJobs = {}  -- [key] = {job, name, amount, started_at, key, id, damage, start_stock, produced}
+local recentLog = {}   -- лог в памяти (новые сверху)
+local MAX_LOG_LINES = 60
+
+local lastTickAt = -INTERVAL  -- чтобы первый тик случился сразу
+local secondsToTick = 0
+local paused = not ENABLED_AT_START
+local meOk = true
+local dbOk = false
+local totalCompleted = 0
+local totalFailed = 0
+
+-- Опрос стоков для прогресса (раз в N секунд)
+local PROGRESS_POLL = 5
+local lastProgressAt = 0
+
+-- Кэш последнего загруженного списка товаров (для добивания очереди между тиками)
+local cachedItems = nil
 
 -- =========================================================
--- ВРЕМЯ И ЛОГГИРОВАНИЕ (по тому же шаблону что в main.lua)
+-- УТИЛИТЫ
 -- =========================================================
 local function formatUnixTime(unix)
     local z = math.floor(unix / 86400) + 719468
@@ -56,18 +75,24 @@ local function getRealTime()
         f:write(""); f:close()
         local lm = fs.lastModified(tmp_file)
         fs.remove(tmp_file)
-        if lm and lm > 0 then return formatUnixTime(math.floor(lm/1000) + tz*3600) end
+        if lm and lm > 0 then return formatUnixTime(math.floor(lm / 1000) + tz * 3600) end
     end
     return os.date("%Y-%m-%d %H:%M:%S") .. " (игр)"
 end
 
+local function pushLog(line)
+    table.insert(recentLog, 1, line)
+    while #recentLog > MAX_LOG_LINES do table.remove(recentLog) end
+end
+
 local function log(action, details)
-    local time = getRealTime()
-    local line = string.format("[%s] %s | crafter | %s", time, action, details)
-    print(line)
+    local t = getRealTime()
+    local short = "[" .. t:sub(12, 19) .. "] " .. action .. " | " .. (details or "")
+    pushLog(short)
+    -- В файл — с полной датой
+    local fileLine = string.format("[%s] %s | crafter | %s", t, action, details or "")
     local f = io.open("/home/crafter.log", "a")
-    if f then f:write(line .. "\n"); f:close() end
-    -- ротация лога
+    if f then f:write(fileLine .. "\n"); f:close() end
     local sz = fs.size("/home/crafter.log")
     if sz and sz > 100000 then
         local lines = {}
@@ -80,36 +105,46 @@ local function log(action, details)
             fw:close()
         end
     end
+    -- В БД (опционально, не блокируем)
     if config.use_database then
         pcall(function()
             network.request("POST", "/logs", json.encode({
-                time = time, action = action, user = "crafter", details = details
+                time = t, action = action, user = "crafter", details = details or ""
             }))
         end)
     end
 end
 
 -- =========================================================
--- ИСТОЧНИК СПИСКА ТОВАРОВ
+-- ИСТОЧНИК ТОВАРОВ
 -- =========================================================
-local function loadShopItems()
-    -- сначала пробуем БД (актуальный список)
-    if config.use_database and component.isAvailable("internet") then
-        local ok, res = network.get("/shop")
-        if ok and res and res ~= "null" then
-            local parsed = json.decode(res)
-            if parsed and parsed.items then
-                if type(parsed.items) == "table" then
-                    local arr = {}
-                    if #parsed.items > 0 then arr = parsed.items
-                    else for _, v in pairs(parsed.items) do table.insert(arr, v) end end
-                    return arr
-                end
-            end
+local function loadCrafterItems()
+    if config.use_database then
+        if not component.isAvailable("internet") then
+            log("ОШИБКА", "Internet Card не найдена")
+            return nil
         end
+        if not config.firebase_url or config.firebase_url == "" or config.firebase_url == "заменить" then
+            log("ОШИБКА", "firebase_url не настроен в /home/config.lua")
+            return nil
+        end
+        local ok, res = network.get("/crafter")
+        if not ok then log("ОШИБКА", "Запрос /crafter провалился: " .. tostring(res)); return nil end
+        if not res or res == "null" then
+            log("ИНФО", "В БД нет /crafter — добавь предметы через вкладку Автокрафт")
+            return {}
+        end
+        local parsed = json.decode(res)
+        if not parsed then log("ОШИБКА", "Невалидный JSON в /crafter"); return nil end
+        if not parsed.items then return {} end
+        local arr = {}
+        if type(parsed.items) == "table" then
+            if #parsed.items > 0 then arr = parsed.items
+            else for _, v in pairs(parsed.items) do table.insert(arr, v) end end
+        end
+        return arr
     end
-    -- фоллбек на локальный shop_data.json (если crafter живёт на том же компе)
-    local f = io.open("/home/shop_data.json", "r")
+    local f = io.open("/home/crafter_data.json", "r")
     if f then
         local data = f:read("*a"); f:close()
         if data and data ~= "" then
@@ -121,11 +156,10 @@ local function loadShopItems()
 end
 
 -- =========================================================
--- ЧТЕНИЕ СТОКОВ ИЗ МЭ
+-- МЭ-СЕТЬ
 -- =========================================================
 local function getStocks()
     local stocks = {}
-    local got = false
     for addr in component.list("me_interface") do
         local proxy = component.proxy(addr)
         local ok, items = pcall(function() return proxy.getItemsInNetwork() end)
@@ -134,16 +168,12 @@ local function getStocks()
                 local key = (it.name or "") .. "|" .. math.floor(it.damage or 0)
                 stocks[key] = (stocks[key] or 0) + (it.size or 0)
             end
-            got = true
-            break
+            return stocks, true
         end
     end
-    return stocks, got
+    return stocks, false
 end
 
--- =========================================================
--- ЗАКАЗ КРАФТА
--- =========================================================
 local function requestCraft(id, damage, amount)
     for addr in component.list("me_interface") do
         local proxy = component.proxy(addr)
@@ -157,86 +187,343 @@ local function requestCraft(id, damage, amount)
     return nil
 end
 
+-- =========================================================
+-- УПРАВЛЕНИЕ JOB-АМИ
+-- =========================================================
+local function jobStatus(j)
+    local ok_d, done = pcall(function() return j.job.isDone() end)
+    local ok_c, cancel = pcall(function() return j.job.isCanceled() end)
+    local ok_f, failed = pcall(function() return j.job.hasFailed() end)
+    if ok_d and done then return "готов" end
+    if ok_c and cancel then return "отменён" end
+    if ok_f and failed then return "провален" end
+    return "идёт"
+end
+
 local function pruneFinishedJobs()
-    for k, job in pairs(activeJobs) do
-        local done_ok, done = pcall(function() return job.isDone() end)
-        local cancel_ok, cancel = pcall(function() return job.isCanceled() end)
-        local failed_ok, failed = pcall(function() return job.hasFailed() end)
-        if (done_ok and done) or (cancel_ok and cancel) or (failed_ok and failed) then
-            activeJobs[k] = nil
-            log("КРАФТ ЗАВЕРШЁН", k)
+    for key, j in pairs(activeJobs) do
+        local s = jobStatus(j)
+        if s == "готов" then
+            totalCompleted = totalCompleted + 1
+            log("ЗАВЕРШЁН", j.name .. " x" .. j.amount)
+            activeJobs[key] = nil
+        elseif s == "отменён" then
+            log("ОТМЕНЁН", j.name .. " x" .. j.amount)
+            activeJobs[key] = nil
+        elseif s == "провален" then
+            totalFailed = totalFailed + 1
+            log("ПРОВАЛ", j.name .. " x" .. j.amount)
+            activeJobs[key] = nil
         end
     end
 end
 
 -- =========================================================
--- ОДНА ИТЕРАЦИЯ
+-- ПРОГРЕСС ВЫПОЛНЕНИЯ
+-- Снимаем актуальные стоки из МЭ и считаем produced = current - start_stock.
+-- Если игрок забрал что-то — produced не уменьшаем (берём max со старым значением).
+-- Если produced >= amount → крафт считаем готовым и удаляем из activeJobs.
 -- =========================================================
-local function tick()
-    if not ENABLED then return end
-    pruneFinishedJobs()
-    local items = loadShopItems()
-    if not items then log("ОШИБКА", "Не удалось загрузить shop/items"); return end
+local function updateProgress(stocksFromTick)
+    local now = computer.uptime()
+    if not stocksFromTick and (now - lastProgressAt) < PROGRESS_POLL then return nil end
 
-    local stocks, gotStocks = getStocks()
-    if not gotStocks then log("ОШИБКА", "Нет связи с me_interface"); return end
+    local stocks
+    if stocksFromTick then
+        stocks = stocksFromTick
+    else
+        local ok
+        stocks, ok = getStocks()
+        meOk = ok
+        if not ok then return nil end
+    end
+    lastProgressAt = now
 
-    local requested = 0
-    local skipped_active = 0
-    local not_craftable = 0
-    for _, it in ipairs(items) do
-        if it.id and it.id ~= "" then
+    for key, j in pairs(activeJobs) do
+        local cur = stocks[key] or 0
+        local delta = cur - (j.start_stock or 0)
+        if delta > (j.produced or 0) then
+            j.produced = math.min(delta, j.amount)
+        end
+        if (j.produced or 0) >= j.amount then
+            totalCompleted = totalCompleted + 1
+            log("ЗАВЕРШЁН", j.name .. " x" .. j.amount .. " (по стоку)")
+            pcall(function() j.job.cancel() end)
+            activeJobs[key] = nil
+        end
+    end
+    return stocks  -- возвращаем стоки, чтобы tryFillSlots их переиспользовала
+end
+
+local function cancelJob(j)
+    if not j or not j.job then return false end
+    local ok = pcall(function() j.job.cancel() end)
+    if not ok then pcall(function() j.job.Cancel() end) end
+    return true
+end
+
+-- =========================================================
+-- ПОДСЧЁТ АКТИВНЫХ
+-- =========================================================
+local function countActive()
+    local n = 0
+    for _ in pairs(activeJobs) do n = n + 1 end
+    return n
+end
+
+-- =========================================================
+-- ДОБИВАНИЕ ОЧЕРЕДИ
+-- Использует кэшированный список товаров и переданные/свежие стоки.
+-- Запускает столько новых крафтов, чтобы countActive() достигло maxConcurrent.
+-- Вызывается между основными тиками — даёт быструю реакцию на завершение крафта.
+-- =========================================================
+local function tryFillSlots(stocks)
+    if paused then return end
+    if not cachedItems then return end
+    if countActive() >= maxConcurrent then return end
+
+    if not stocks then
+        local ok
+        stocks, ok = getStocks()
+        meOk = ok
+        if not ok then return end
+    end
+
+    local started = 0
+    for _, it in ipairs(cachedItems) do
+        if countActive() >= maxConcurrent then break end
+        if it.id and it.id ~= "" and it.enabled ~= false then
             local dmg = math.floor(tonumber(it.damage) or 0)
             local key = it.id .. "|" .. dmg
             local stock = stocks[key] or 0
+            local keep = tonumber(it.keep_amount) or 1
+            if stock < keep and not activeJobs[key] then
+                local target = tonumber(it.craft_amount) or DEFAULT_AMOUNT
+                local job = requestCraft(it.id, dmg, target)
+                if job then
+                    activeJobs[key] = {
+                        job = job, name = it.name or it.id,
+                        amount = target, started_at = computer.uptime(),
+                        key = key, id = it.id, damage = dmg,
+                        start_stock = stock, produced = 0,
+                    }
+                    started = started + 1
+                    log("ЗАКАЗАН", (it.name or it.id) .. " x" .. target
+                        .. " (из очереди, stock=" .. stock .. "/" .. keep .. ")")
+                end
+            end
+        end
+    end
+end
+
+-- =========================================================
+-- ОСНОВНОЙ ТИК
+-- Загружает /shop, обновляет cachedItems, заполняет слоты до maxConcurrent.
+-- =========================================================
+local function tick()
+    pruneFinishedJobs()
+
+    local stocks, gotStocks = getStocks()
+    meOk = gotStocks
+    if not gotStocks then
+        log("ОШИБКА", "Нет связи с me_interface")
+        return
+    end
+
+    local items = loadCrafterItems()
+    dbOk = (items ~= nil)
+    if not items then return end
+    cachedItems = items  -- запоминаем для tryFillSlots между тиками
+
+    local requested = 0
+    local already = 0
+    local capped = 0
+    local skipped = 0
+    local disabled = 0
+    for _, it in ipairs(items) do
+        if it.enabled == false then
+            disabled = disabled + 1
+        elseif it.id and it.id ~= "" then
+            local dmg = math.floor(tonumber(it.damage) or 0)
+            local key = it.id .. "|" .. dmg
+            local stock = stocks[key] or 0
+            local keep = tonumber(it.keep_amount) or 1
             local target = tonumber(it.craft_amount) or DEFAULT_AMOUNT
 
-            if stock <= THRESHOLD then
+            if stock < keep then
                 if activeJobs[key] then
-                    skipped_active = skipped_active + 1
+                    already = already + 1
+                elseif countActive() >= maxConcurrent then
+                    capped = capped + 1   -- товар в очереди, ждёт свободного слота
                 else
                     local job = requestCraft(it.id, dmg, target)
                     if job then
-                        activeJobs[key] = job
+                        activeJobs[key] = {
+                            job = job, name = it.name or it.id,
+                            amount = target, started_at = computer.uptime(),
+                            key = key, id = it.id, damage = dmg,
+                            start_stock = stock, produced = 0,
+                        }
                         requested = requested + 1
-                        log("ЗАКАЗАН КРАФТ", (it.name or it.id) .. " x" .. target
-                            .. " (stock=" .. stock .. ", id=" .. it.id .. ", damage=" .. dmg .. ")")
+                        log("ЗАКАЗАН", (it.name or it.id) .. " x" .. target
+                            .. " (stock=" .. stock .. "/" .. keep .. ")")
                     else
-                        not_craftable = not_craftable + 1
+                        skipped = skipped + 1
                     end
                 end
             end
         end
     end
+    if requested > 0 or already > 0 or capped > 0 or skipped > 0 then
+        log("ТИК", string.format(
+            "заказано=%d, уже_крафтится=%d, в_очереди=%d, не_craftable=%d, выкл=%d, всего=%d, лимит=%d",
+            requested, already, capped, skipped, disabled, #items, maxConcurrent))
+    end
 
-    if requested > 0 or skipped_active > 0 then
-        log("ИТЕРАЦИЯ", string.format(
-            "товаров=%d, заказано=%d, уже_крафтится=%d, не_craftable=%d",
-            #items, requested, skipped_active, not_craftable))
+    -- сразу пересчитываем прогресс по уже полученным стокам (без двойного запроса в ME)
+    updateProgress(stocks)
+end
+
+-- =========================================================
+-- РЕНДЕР
+-- =========================================================
+local function buildState()
+    -- сортируем jobs по времени создания (новые сверху)
+    local arr = {}
+    for _, j in pairs(activeJobs) do table.insert(arr, j) end
+    table.sort(arr, function(a, b) return (a.started_at or 0) > (b.started_at or 0) end)
+    local out = {}
+    local now = computer.uptime()
+    for _, j in ipairs(arr) do
+        table.insert(out, {
+            key = j.key, name = j.name, amount = j.amount,
+            produced = j.produced or 0,
+            status = jobStatus(j),
+            age_sec = math.floor(now - (j.started_at or now)),
+        })
+    end
+    return {
+        jobs = out,
+        recentLog = recentLog,
+        secondsToTick = secondsToTick,
+        totalCompleted = totalCompleted,
+        totalFailed = totalFailed,
+        meOk = meOk,
+        dbOk = dbOk,
+        paused = paused,
+        maxConcurrent = maxConcurrent,
+        activeCount = countActive(),
+    }
+end
+
+local function redraw()
+    pcall(function() gui.draw(buildState()) end)
+end
+
+-- =========================================================
+-- ОБРАБОТКА КНОПОК
+-- =========================================================
+local function handleClick(id)
+    if id == "force_tick" then
+        lastTickAt = -INTERVAL  -- следующий тик сразу
+        log("СОБЫТИЕ", "Принудительный тик")
+    elseif id == "pause" then
+        paused = not paused
+        log("СОБЫТИЕ", paused and "Автокрафт приостановлен" or "Автокрафт включён")
+    elseif id == "cancel_all" then
+        local n = 0
+        for _, j in pairs(activeJobs) do
+            cancelJob(j); n = n + 1
+        end
+        log("СОБЫТИЕ", "Отменены все крафты (" .. n .. ")")
+    elseif id == "limit_dec" then
+        if maxConcurrent > 1 then
+            maxConcurrent = maxConcurrent - 1
+            log("СОБЫТИЕ", "Лимит одновременных крафтов: " .. maxConcurrent)
+        end
+    elseif id == "limit_inc" then
+        maxConcurrent = maxConcurrent + 1
+        log("СОБЫТИЕ", "Лимит одновременных крафтов: " .. maxConcurrent)
+        -- при увеличении лимита сразу добиваем очередь
+        local stocks = updateProgress()
+        if stocks then tryFillSlots(stocks) else tryFillSlots() end
+    elseif id == "quit" then
+        log("СТОП", "Выход по кнопке")
+        gpu = component.gpu
+        gpu.setBackground(0x000000); gpu.setForeground(0xFFFFFF)
+        require("term").clear()
+        os.exit()
+    elseif id and id:match("^cancel_%d+$") then
+        local idx = tonumber(id:match("%d+"))
+        -- собираем активные в том же порядке, что в buildState
+        local arr = {}
+        for _, j in pairs(activeJobs) do table.insert(arr, j) end
+        table.sort(arr, function(a, b) return (a.started_at or 0) > (b.started_at or 0) end)
+        local j = arr[idx]
+        if j then
+            cancelJob(j)
+            log("ОТМЕНА", "Запрошена отмена: " .. j.name)
+            -- статус обновится на следующем pruneFinishedJobs
+        end
     end
 end
 
 -- =========================================================
--- ЦИКЛ
+-- ОСНОВНОЙ ЦИКЛ
 -- =========================================================
-print("=== АВТОКРАФТ МАГАЗИНА ===")
-print(string.format("Интервал: %d с, порог: %d, заказ по: %d шт", INTERVAL, THRESHOLD, DEFAULT_AMOUNT))
-print("Источник: " .. (config.use_database and "Firebase /shop" or "локальный /home/shop_data.json"))
-print("Закрытие: Ctrl+Alt+C")
-log("СТАРТ", string.format("interval=%ds, threshold=%d, amount=%d",
-    INTERVAL, THRESHOLD, DEFAULT_AMOUNT))
+log("СТАРТ", string.format("interval=%ds, default_amount=%d, max_concurrent=%d",
+    INTERVAL, DEFAULT_AMOUNT, maxConcurrent))
 
-while true do
-    local ok, err = pcall(tick)
-    if not ok then log("FATAL_TICK", tostring(err)) end
+local function loop()
+    redraw()
+    while true do
+        local sinceLast = computer.uptime() - lastTickAt
+        secondsToTick = math.max(0, INTERVAL - math.floor(sinceLast))
 
-    -- ждём INTERVAL секунд, реагируем на interrupted (Ctrl+Alt+C)
-    local target_uptime = computer.uptime() + INTERVAL
-    while computer.uptime() < target_uptime do
-        local ev = event.pull(1, "interrupted")
-        if ev then
-            log("СТОП", "Остановлено пользователем")
-            os.exit()
+        -- Запускаем тик, если пора и не на паузе
+        if not paused and sinceLast >= INTERVAL then
+            local ok, err = pcall(tick)
+            if not ok then log("FATAL_TICK", tostring(err)) end
+            lastTickAt = computer.uptime()
+            redraw()
+        end
+
+        -- Подтягиваем статусы и прогресс, при свободных слотах сразу добиваем очередь
+        pruneFinishedJobs()
+        local stocks = updateProgress()
+        if stocks then tryFillSlots(stocks) end
+
+        local ev = { event.pull(1) }
+        local name = ev[1]
+        if name == "touch" then
+            local x, y = ev[3], ev[4]
+            local id = gui.checkClick(x, y)
+            if id then
+                pcall(computer.beep, 1000, 0.05)
+                handleClick(id)
+                redraw()
+            end
+        elseif name == "key_down" then
+            local code = ev[3]
+            -- F = принудительный тик, E = выход, P = пауза
+            if code == 33 then handleClick("force_tick"); redraw()      -- F
+            elseif code == 18 then handleClick("quit")                   -- E
+            elseif code == 25 then handleClick("pause"); redraw() end    -- P
+        elseif name == "interrupted" then
+            handleClick("quit")
+        elseif not name then
+            -- таймаут event.pull — просто перерисуем (обновим таймеры)
+            redraw()
         end
     end
+end
+
+local ok, err = pcall(loop)
+if not ok then
+    log("CRASH", tostring(err))
+    component.gpu.setBackground(0x000000)
+    component.gpu.setForeground(0xFF5555)
+    require("term").clear()
+    print("Программа упала: " .. tostring(err))
+    print("Лог: /home/crafter.log")
 end
