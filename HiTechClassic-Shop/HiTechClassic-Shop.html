@@ -134,6 +134,7 @@
                     <div class="hidden md:flex bg-gray-700 p-4 text-xs font-medium text-gray-300 uppercase tracking-wider gap-4">
                         <div class="flex-1">Название</div>
                         <div class="w-32">Категория</div>
+                        <div class="w-20">Мета</div>
                         <div class="w-24">Цена</div>
                         <div class="w-[180px] text-center">Действия</div>
                     </div>
@@ -406,7 +407,16 @@
             const name = document.getElementById(`name-${key}`).value;
             const cat = document.getElementById(`cat-${key}`).value;
             const price = document.getElementById(`price-${key}`).value;
-            
+            const damageEl = document.getElementById(`damage-${key}`);
+            const damageRaw = damageEl ? damageEl.value : '';
+            // damage пишем только если поле есть и значение корректное
+            let damage = null;
+            if (damageRaw !== '') {
+                const d = parseInt(damageRaw, 10);
+                if (Number.isFinite(d) && d >= 0) damage = d;
+                else { showToast('Некорректная мета (должна быть ≥ 0)', 'error'); return; }
+            }
+
             db.ref('shop').once('value').then((snapshot) => {
                 let shopData = snapshot.val() || {};
                 if (typeof shopData === 'string') { try { shopData = JSON.parse(shopData); } catch(e) { shopData = { items: [] }; } }
@@ -414,6 +424,7 @@
                     shopData.items[key].name = name;
                     shopData.items[key].category = cat;
                     shopData.items[key].price = Number(price);
+                    if (damage !== null) shopData.items[key].damage = damage;
                     db.ref('shop').set(shopData)
                       .then(() => showToast('Товар успешно обновлен', 'success'))
                       .catch(e => showToast('Ошибка сохранения', 'error'));
@@ -578,6 +589,7 @@
                 const nameVal = (item.name || '').replace(/"/g, '&quot;');
                 const catVal  = (item.category || '').replace(/"/g, '&quot;');
                 const priceVal = item.price ?? 0;
+                const damageVal = item.damage ?? 0;
                 parts.push(
                     '<div class="p-4 flex flex-col md:flex-row md:items-center gap-4 hover:bg-gray-750 transition">'
                   + '  <div class="flex-1">'
@@ -587,6 +599,10 @@
                   + '  <div class="w-full md:w-32">'
                   + '    <label class="text-xs text-gray-400 block md:hidden mb-1">Категория</label>'
                   + '    <input type="text" id="cat-' + key + '" value="' + catVal + '" class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">'
+                  + '  </div>'
+                  + '  <div class="w-full md:w-20">'
+                  + '    <label class="text-xs text-gray-400 block md:hidden mb-1">Мета (damage)</label>'
+                  + '    <input type="number" min="0" step="1" id="damage-' + key + '" value="' + damageVal + '" class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">'
                   + '  </div>'
                   + '  <div class="w-full md:w-24">'
                   + '    <label class="text-xs text-gray-400 block md:hidden mb-1">Цена</label>'
