@@ -237,6 +237,15 @@
                     <div id="crafter-stats" class="text-sm text-gray-400">—</div>
                 </div>
 
+                <!-- БЛОК СТАТУСА КРАФТЕРА -->
+                <div id="crafter-status-block" class="bg-gray-800 shadow rounded-lg border border-gray-700 mb-6 p-4">
+                    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                        <h3 class="text-lg font-semibold">Статус автокрафтера</h3>
+                        <div id="crafter-status-meta" class="text-xs text-gray-500">—</div>
+                    </div>
+                    <div id="crafter-status-body" class="text-sm text-gray-400">Загрузка статуса…</div>
+                </div>
+
                 <div class="bg-gray-800 shadow rounded-lg border border-gray-700 mb-6 p-4">
                     <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
                         <input id="crafter-search" type="text" placeholder="Поиск по названию / id / numeric_id…"
@@ -441,6 +450,14 @@
                 }
                 crafterRender();
             });
+
+            // СТАТУС АВТОКРАФТЕРА (публикует сам crafter.lua)
+            db.ref('crafter_status').on('value', (snap) => {
+                window.CRAFTER_STATUS = snap.val() || null;
+                renderCrafterStatus();
+            });
+            // и обновляем «свежесть» статуса каждые 5 сек (показываем offline если давно нет апдейтов)
+            setInterval(renderCrafterStatus, 5000);
 
             // ЛОГИ
             db.ref('logs').orderByKey().limitToLast(100).on('value', (snapshot) => {
@@ -664,6 +681,123 @@
                 );
             }
             list.innerHTML = parts.join('');
+        }
+
+        // === Статус автокрафтера (читается из /crafter_status) ===
+        function renderCrafterStatus() {
+            const body = document.getElementById('crafter-status-body');
+            const meta = document.getElementById('crafter-status-meta');
+            const block = document.getElementById('crafter-status-block');
+            const s = window.CRAFTER_STATUS;
+            if (!s) {
+                body.innerHTML = '<div class="text-gray-500">Статус ещё не получен. Запусти crafter в игре и подожди ~10 секунд.</div>';
+                meta.textContent = '';
+                block.className = 'bg-gray-800 shadow rounded-lg border border-gray-700 mb-6 p-4';
+                return;
+            }
+
+            // вычисляем «свежесть» по updated_at вида "YYYY-MM-DD HH:MM:SS"
+            let online = true;
+            let ageSec = 0;
+            if (s.updated_at) {
+                const m = String(s.updated_at).match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/);
+                if (m) {
+                    const t = new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]).getTime();
+                    ageSec = Math.floor((Date.now() - t) / 1000);
+                    if (ageSec > 30) online = false;
+                }
+            }
+            // если crafter явно сказал «paused» через offline-snapshot — это не «оффлайн по времени»
+            const explicitlyDown = !s.me_ok && !s.db_ok && Array.isArray(s.issues) &&
+                s.issues.some(i => /остановлена/i.test(String(i)));
+
+            const onlineDot = (online && !explicitlyDown)
+                ? '<span class="inline-block w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse"></span>'
+                : '<span class="inline-block w-2.5 h-2.5 rounded-full bg-red-500"></span>';
+            const onlineText = (online && !explicitlyDown)
+                ? '<span class="text-green-400 font-semibold">ON</span>'
+                : '<span class="text-red-400 font-semibold">OFF</span>';
+            const ageLabel = ageSec < 60 ? (ageSec + ' сек назад')
+                          : ageSec < 3600 ? (Math.floor(ageSec/60) + ' мин назад')
+                          : (Math.floor(ageSec/3600) + ' ч назад');
+
+            meta.innerHTML = onlineDot + ' ' + onlineText
+                + '<span class="text-gray-500 ml-3">обновлён: ' + neiEsc(s.updated_at || '—') + ' (' + ageLabel + ')</span>';
+
+            // Индикаторы
+            const meOk = s.me_ok ? '<span class="text-green-400">ME: OK</span>' : '<span class="text-red-400">ME: ОТКЛ</span>';
+            const dbOk = s.db_ok ? '<span class="text-green-400">БД: OK</span>' : '<span class="text-red-400">БД: ОТКЛ</span>';
+            const pausedLbl = s.paused ? '<span class="text-yellow-400">ПАУЗА</span>' : '<span class="text-green-400">АВТО</span>';
+
+            // CPU info
+            let cpuHtml = '<span class="text-gray-500">CPU: нет данных</span>';
+            if (s.cpu_info) {
+                const ci = s.cpu_info;
+                const free = (ci.free ?? 0);
+                const busy = (ci.busy ?? 0);
+                const total = (ci.total ?? 0);
+                let cpuCol = 'text-green-400';
+                if (total === 0) cpuCol = 'text-red-400';
+                else if (free === 0) cpuCol = 'text-yellow-400';
+                cpuHtml = '<span class="' + cpuCol + '">CPU: ' + free + ' свободно / ' + total + ' всего</span>';
+            }
+
+            // Проблемы
+            let issuesHtml = '';
+            if (Array.isArray(s.issues) && s.issues.length) {
+                issuesHtml = '<div class="mt-4">'
+                    + '<div class="text-xs uppercase tracking-wider text-red-400 mb-1">Проблемы:</div>'
+                    + '<ul class="list-disc list-inside text-sm text-red-300 space-y-0.5">'
+                    + s.issues.map(i => '<li>' + neiEsc(String(i)) + '</li>').join('')
+                    + '</ul></div>';
+            } else if (online && !explicitlyDown) {
+                issuesHtml = '<div class="mt-3 text-sm text-green-400">Всё в порядке, проблем нет.</div>';
+            }
+
+            // Активные крафты
+            let jobsHtml = '';
+            if (Array.isArray(s.active_jobs) && s.active_jobs.length) {
+                jobsHtml = '<div class="mt-4">'
+                    + '<div class="text-xs uppercase tracking-wider text-gray-400 mb-1">Активные крафты ('
+                    +   (s.active_count ?? s.active_jobs.length) + '/' + (s.max_concurrent ?? '?') + '):</div>'
+                    + '<div class="space-y-1">'
+                    + s.active_jobs.map(j => {
+                        const prog = (j.produced || 0) + '/' + (j.amount || 0);
+                        const frac = j.amount ? Math.min(1, (j.produced || 0) / j.amount) : 0;
+                        const progCol = frac >= 1 ? 'text-green-400' : (frac > 0 ? 'text-yellow-400' : 'text-gray-400');
+                        const statusCol = j.status === 'идёт' ? 'text-green-400'
+                                       : j.status === 'провален' ? 'text-red-400'
+                                       : j.status === 'отменён' ? 'text-yellow-400'
+                                       : 'text-gray-400';
+                        const ageS = j.age_sec || 0;
+                        const ageStr = ageS < 60 ? (ageS + 'c') : (Math.floor(ageS/60) + 'м ' + (ageS%60) + 'c');
+                        return '<div class="flex items-center gap-3 text-sm py-1 px-2 bg-gray-900 rounded">'
+                            + '<div class="flex-1 truncate text-white">' + neiEsc(j.name || j.id) + '</div>'
+                            + '<div class="' + progCol + ' tabular w-20">' + prog + '</div>'
+                            + '<div class="text-gray-500 tabular w-16 text-right">' + ageStr + '</div>'
+                            + '<div class="' + statusCol + ' w-20 text-right">' + neiEsc(j.status || '?') + '</div>'
+                            + '</div>';
+                    }).join('')
+                    + '</div></div>';
+            } else if (online && !explicitlyDown) {
+                jobsHtml = '<div class="mt-3 text-sm text-gray-500">Нет активных крафтов.</div>';
+            }
+
+            // Счётчики
+            const counters = '<div class="mt-2 text-xs text-gray-500">Завершено за сессию: '
+                + (s.total_completed || 0) + ' • Провалено: ' + (s.total_failed || 0)
+                + ' • Лимит параллельных: ' + (s.max_concurrent || '?') + '</div>';
+
+            body.innerHTML =
+                '<div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">'
+              + '  <div>' + meOk + '</div>'
+              + '  <div>' + dbOk + '</div>'
+              + '  <div>' + pausedLbl + '</div>'
+              + '  <div>' + cpuHtml + '</div>'
+              + '</div>'
+              + counters
+              + issuesHtml
+              + jobsHtml;
         }
 
         window.saveCrafterItem = function(key) {
