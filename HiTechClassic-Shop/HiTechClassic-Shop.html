@@ -69,6 +69,7 @@
                             <button onclick="switchTab('users')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium bg-gray-900 text-white" id="tab-users">Игроки</button>
                             <button onclick="switchTab('shop')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-shop">Товары</button>
                             <button onclick="switchTab('nei')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-nei">NEI</button>
+                            <button onclick="switchTab('crafter')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-crafter">Автокрафт</button>
                             <button onclick="switchTab('logs')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-logs">Логи</button>
                         </div>
                     </div>
@@ -81,6 +82,7 @@
                     <button onclick="switchTab('users')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium bg-gray-900 text-white" id="tab-users-mob">Игроки</button>
                     <button onclick="switchTab('shop')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-shop-mob">Товары</button>
                     <button onclick="switchTab('nei')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-nei-mob">NEI</button>
+                    <button onclick="switchTab('crafter')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-crafter-mob">Автокрафт</button>
                     <button onclick="switchTab('logs')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-logs-mob">Логи</button>
                 </div>
             </div>
@@ -188,6 +190,14 @@
                             <input id="nei-onlyNotInShop" type="checkbox" class="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500">
                             <span>только не в магазине</span>
                         </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input id="nei-onlyInCrafter" type="checkbox" class="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500">
+                            <span>только в автокрафте</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input id="nei-onlyNotInCrafter" type="checkbox" class="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500">
+                            <span>только не в автокрафте</span>
+                        </label>
                     </div>
                     <details open class="mt-2">
                         <summary class="cursor-pointer text-sm text-gray-300 hover:text-white mb-2">
@@ -219,6 +229,53 @@
                 </div>
 
                 <div id="nei-pager" class="flex items-center justify-center gap-2 mt-6 flex-wrap"></div>
+            </div>
+
+            <div id="content-crafter" class="tab-content hidden">
+                <div class="flex items-center justify-between mb-4 gap-4 flex-wrap">
+                    <h2 class="text-2xl font-bold">Автокрафт — предметы под пополнение</h2>
+                    <div id="crafter-stats" class="text-sm text-gray-400">—</div>
+                </div>
+
+                <div class="bg-gray-800 shadow rounded-lg border border-gray-700 mb-6 p-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
+                        <input id="crafter-search" type="text" placeholder="Поиск по названию / id / numeric_id…"
+                            class="flex-1 bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">
+                        <select id="crafter-sort" class="bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">
+                            <option value="name_asc">Название A→Я</option>
+                            <option value="name_desc">Название Я→A</option>
+                            <option value="keep_asc">Хранить ↑</option>
+                            <option value="keep_desc">Хранить ↓</option>
+                            <option value="mod_asc">Мод A→Я</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+                        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input id="crafter-onlyDisabled" type="checkbox" class="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500">
+                            <span>только выключенные</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input id="crafter-onlyEnabled" type="checkbox" class="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500">
+                            <span>только включённые</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="bg-gray-800 shadow rounded-lg overflow-hidden border border-gray-700">
+                    <div class="hidden md:flex bg-gray-700 px-4 py-3 text-xs font-medium text-gray-300 uppercase tracking-wider gap-4 items-center">
+                        <div class="w-12">Иконка</div>
+                        <div class="flex-1 min-w-0">Название</div>
+                        <div class="w-52 min-w-0">ID</div>
+                        <div class="w-16 text-right">Мета</div>
+                        <div class="w-24">Хранить</div>
+                        <div class="w-24">Заказ по</div>
+                        <div class="w-16 text-center">Вкл</div>
+                        <div class="w-[150px] text-center">Действия</div>
+                    </div>
+                    <div id="crafter-list" class="divide-y divide-gray-700">
+                        <div class="p-6 text-center text-gray-500 text-sm">Загрузка…</div>
+                    </div>
+                </div>
             </div>
 
             <div id="content-logs" class="tab-content hidden">
@@ -362,6 +419,29 @@
                 shopRender();
             });
 
+            // АВТОКРАФТ
+            db.ref('crafter').on('value', (snapshot) => {
+                let crafterData = snapshot.val() || {};
+                if (typeof crafterData === 'string') { try { crafterData = JSON.parse(crafterData); } catch(e) { crafterData = {}; } }
+                const itemsRaw = crafterData.items || [];
+                // карта для NEI: key → индекс в crafter.items
+                window.NEI.crafterMap = new Map();
+                window.CRAFTER.raw = [];
+                Object.keys(itemsRaw).forEach((k) => {
+                    const it = itemsRaw[k];
+                    if (!it) return;
+                    const key = neiItemKey(it);
+                    if (key) window.NEI.crafterMap.set(key, Number(k));
+                    window.CRAFTER.raw.push({ idx: Number(k), item: it });
+                });
+                if (window.NEI.loaded) neiRender();
+                if (!window.CRAFTER.initialized) {
+                    crafterBindControls();
+                    window.CRAFTER.initialized = true;
+                }
+                crafterRender();
+            });
+
             // ЛОГИ
             db.ref('logs').orderByKey().limitToLast(100).on('value', (snapshot) => {
                 const logsRaw = snapshot.val() || {};
@@ -462,6 +542,258 @@
         // =====================================================================
         // Shop tab — фильтры/сортировка/поиск по товарам из БД
         // =====================================================================
+        // =====================================================================
+        // Crafter tab — отдельный список предметов для автокрафта
+        // Структура в Firebase: /crafter/items[] = {id, damage, name, icon,
+        //                                            keep_amount, craft_amount, enabled}
+        // =====================================================================
+        window.CRAFTER = {
+            raw: [],        // [{idx, item}]
+            search: '',
+            sort: 'name_asc',
+            onlyDisabled: false,
+            onlyEnabled: false,
+            initialized: false,
+        };
+
+        function crafterBindControls() {
+            let to;
+            document.getElementById('crafter-search').addEventListener('input', (e) => {
+                clearTimeout(to);
+                to = setTimeout(() => {
+                    window.CRAFTER.search = e.target.value.trim();
+                    crafterRender();
+                }, 120);
+            });
+            document.getElementById('crafter-sort').addEventListener('change', (e) => {
+                window.CRAFTER.sort = e.target.value;
+                crafterRender();
+            });
+            document.getElementById('crafter-onlyDisabled').addEventListener('change', (e) => {
+                window.CRAFTER.onlyDisabled = e.target.checked;
+                if (e.target.checked) {
+                    document.getElementById('crafter-onlyEnabled').checked = false;
+                    window.CRAFTER.onlyEnabled = false;
+                }
+                crafterRender();
+            });
+            document.getElementById('crafter-onlyEnabled').addEventListener('change', (e) => {
+                window.CRAFTER.onlyEnabled = e.target.checked;
+                if (e.target.checked) {
+                    document.getElementById('crafter-onlyDisabled').checked = false;
+                    window.CRAFTER.onlyDisabled = false;
+                }
+                crafterRender();
+            });
+        }
+
+        function crafterRender() {
+            let arr = window.CRAFTER.raw.slice();
+            const q = (window.CRAFTER.search || '').toLowerCase();
+            if (q) {
+                arr = arr.filter((p) => {
+                    const it = p.item;
+                    const n = (it.name || '').toLowerCase();
+                    const id = (it.id || '').toLowerCase();
+                    const num = it.numeric_id != null ? String(it.numeric_id) : '';
+                    return n.includes(q) || id.includes(q) || num === q;
+                });
+            }
+            if (window.CRAFTER.onlyDisabled) arr = arr.filter((p) => p.item.enabled === false);
+            if (window.CRAFTER.onlyEnabled)  arr = arr.filter((p) => p.item.enabled !== false);
+
+            switch (window.CRAFTER.sort) {
+                case 'name_asc':  arr.sort((a,b) => (a.item.name||'').localeCompare(b.item.name||'','ru')); break;
+                case 'name_desc': arr.sort((a,b) => (b.item.name||'').localeCompare(a.item.name||'','ru')); break;
+                case 'keep_asc':  arr.sort((a,b) => (Number(a.item.keep_amount)||0) - (Number(b.item.keep_amount)||0)); break;
+                case 'keep_desc': arr.sort((a,b) => (Number(b.item.keep_amount)||0) - (Number(a.item.keep_amount)||0)); break;
+                case 'mod_asc':   arr.sort((a,b) => {
+                                      const c = ((a.item.id||'').split(':')[0] || '').localeCompare((b.item.id||'').split(':')[0] || '');
+                                      return c !== 0 ? c : (a.item.name||'').localeCompare(b.item.name||'','ru');
+                                  }); break;
+            }
+
+            document.getElementById('crafter-stats').textContent =
+                arr.length + ' / ' + window.CRAFTER.raw.length + ' предметов';
+
+            const list = document.getElementById('crafter-list');
+            if (!arr.length) {
+                list.innerHTML = '<div class="p-6 text-center text-gray-500 text-sm">Ничего не найдено</div>';
+                return;
+            }
+            const parts = [];
+            for (const p of arr) {
+                const it = p.item;
+                const key = p.idx;
+                const enabled = (it.enabled !== false);
+                const icon = it.icon
+                    ? '<img loading="lazy" src="./item_icons/' + neiEscAttr(it.icon) + '" alt="" class="item-icon">'
+                    : '<div class="item-icon-empty">—</div>';
+                const nameVal = (it.name || '').replace(/"/g, '&quot;');
+                parts.push(
+                    '<div class="px-4 py-3 flex flex-col md:flex-row md:items-center gap-3 md:gap-4 hover:bg-gray-750 transition ' + (enabled ? '' : 'opacity-50') + '">'
+                  + '  <div class="w-12 flex-none">' + icon + '</div>'
+                  + '  <div class="flex-1 min-w-0">'
+                  + '    <label class="text-xs text-gray-400 block md:hidden mb-1">Название</label>'
+                  + '    <input type="text" id="cr-name-' + key + '" value="' + nameVal + '" class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">'
+                  + '  </div>'
+                  + '  <div class="md:w-52 min-w-0">'
+                  + '    <div class="md:hidden text-[10px] uppercase text-gray-500 mb-0.5">ID</div>'
+                  + '    <div class="mono text-[11px] text-blue-300 truncate">' + neiEsc(it.id || '') + '</div>'
+                  + '  </div>'
+                  + '  <div class="md:w-16 md:text-right">'
+                  + '    <div class="md:hidden text-[10px] uppercase text-gray-500 mb-0.5">Мета</div>'
+                  + '    <div class="mono tabular text-[11px] text-gray-400">' + (it.damage ?? 0) + '</div>'
+                  + '  </div>'
+                  + '  <div class="w-full md:w-24">'
+                  + '    <label class="text-xs text-gray-400 block md:hidden mb-1">Хранить</label>'
+                  + '    <input type="number" min="0" id="cr-keep-' + key + '" value="' + (it.keep_amount ?? 0) + '" class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">'
+                  + '  </div>'
+                  + '  <div class="w-full md:w-24">'
+                  + '    <label class="text-xs text-gray-400 block md:hidden mb-1">Заказ по</label>'
+                  + '    <input type="number" min="1" id="cr-craft-' + key + '" value="' + (it.craft_amount ?? 64) + '" class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">'
+                  + '  </div>'
+                  + '  <div class="md:w-16 flex md:justify-center">'
+                  + '    <button onclick="toggleCrafterEnabled(' + key + ')" class="text-xs font-medium px-2 py-1 rounded ' + (enabled ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-600 hover:bg-gray-500') + ' text-white">' + (enabled ? 'ON' : 'OFF') + '</button>'
+                  + '  </div>'
+                  + '  <div class="flex gap-2 w-full md:w-[150px] pt-2 md:pt-0 border-t border-gray-700 md:border-t-0 mt-2 md:mt-0">'
+                  + '    <button onclick="saveCrafterItem(' + key + ')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-2 px-3 rounded transition">Сохр.</button>'
+                  + '    <button onclick="deleteCrafterItem(' + key + ')" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs font-medium py-2 px-3 rounded transition">×</button>'
+                  + '  </div>'
+                  + '</div>'
+                );
+            }
+            list.innerHTML = parts.join('');
+        }
+
+        window.saveCrafterItem = function(key) {
+            const name = document.getElementById('cr-name-' + key).value;
+            const keep = parseInt(document.getElementById('cr-keep-' + key).value, 10);
+            const craftAmount = parseInt(document.getElementById('cr-craft-' + key).value, 10);
+            if (!Number.isFinite(keep) || keep < 0) { showToast('Некорректное "Хранить"', 'error'); return; }
+            if (!Number.isFinite(craftAmount) || craftAmount < 1) { showToast('Некорректное "Заказ по"', 'error'); return; }
+            db.ref('crafter').once('value').then((snap) => {
+                let cd = snap.val() || {};
+                if (typeof cd === 'string') { try { cd = JSON.parse(cd); } catch(e) { cd = {}; } }
+                let items = cd.items || [];
+                if (!Array.isArray(items)) items = Object.values(items);
+                if (items[key]) {
+                    items[key].name = name;
+                    items[key].keep_amount = keep;
+                    items[key].craft_amount = craftAmount;
+                    cd.items = items;
+                    db.ref('crafter').set(cd)
+                        .then(() => {
+                            showToast('Сохранено: ' + name, 'success');
+                            neiLog('АВТОКРАФТ ИЗМЕНЁН',
+                                '«' + name + '» (id=' + (items[key].id || '—')
+                                + ', хранить=' + keep + ', заказ_по=' + craftAmount + ')');
+                        })
+                        .catch(e => { console.error(e); showToast('Ошибка сохранения', 'error'); });
+                }
+            });
+        };
+
+        window.deleteCrafterItem = function(key) {
+            const arr = window.CRAFTER.raw;
+            const found = arr.find((p) => p.idx === key);
+            const name = found ? (found.item.name || found.item.id || '?') : '?';
+            if (!confirm('Убрать из автокрафта: ' + name + '?')) return;
+            db.ref('crafter').once('value').then((snap) => {
+                let cd = snap.val() || {};
+                if (typeof cd === 'string') { try { cd = JSON.parse(cd); } catch(e) { cd = {}; } }
+                let items = cd.items || [];
+                if (!Array.isArray(items)) items = Object.values(items);
+                const removed = items[Number(key)] || {};
+                items.splice(Number(key), 1);
+                cd.items = items.filter(Boolean);
+                db.ref('crafter').set(cd)
+                    .then(() => {
+                        showToast('Убран: ' + name, 'success');
+                        neiLog('АВТОКРАФТ УДАЛЁН',
+                            '«' + (removed.name || name) + '» (id=' + (removed.id || '—') + ')');
+                    })
+                    .catch(e => { console.error(e); showToast('Ошибка удаления', 'error'); });
+            });
+        };
+
+        window.toggleCrafterEnabled = function(key) {
+            db.ref('crafter').once('value').then((snap) => {
+                let cd = snap.val() || {};
+                if (typeof cd === 'string') { try { cd = JSON.parse(cd); } catch(e) { cd = {}; } }
+                let items = cd.items || [];
+                if (!Array.isArray(items)) items = Object.values(items);
+                if (items[key]) {
+                    const newState = !(items[key].enabled !== false);
+                    items[key].enabled = newState;
+                    cd.items = items;
+                    db.ref('crafter').set(cd)
+                        .then(() => {
+                            neiLog('АВТОКРАФТ ' + (newState ? 'ВКЛ' : 'ВЫКЛ'),
+                                '«' + (items[key].name || items[key].id || '?') + '»');
+                        });
+                }
+            });
+        };
+
+        // Добавление предмета в автокрафт (из NEI)
+        window.neiAddToCrafter = function(payloadB64) {
+            const x = JSON.parse(decodeURIComponent(escape(atob(payloadB64))));
+            const keepStr = prompt('Сколько штук ХРАНИТЬ в МЭ "' + x.name + '"?\nКогда stock <= этого числа — запустится крафт.', '64');
+            if (keepStr === null) return;
+            const keep = parseInt(keepStr, 10);
+            if (!Number.isFinite(keep) || keep < 0) { showToast('Некорректное число', 'error'); return; }
+            const craftStr = prompt('Сколько штук ЗАКАЗЫВАТЬ за раз для "' + x.name + '"?', '64');
+            if (craftStr === null) return;
+            const craftAmount = parseInt(craftStr, 10);
+            if (!Number.isFinite(craftAmount) || craftAmount < 1) { showToast('Некорректное число', 'error'); return; }
+
+            db.ref('crafter').once('value').then((snap) => {
+                let cd = snap.val() || {};
+                if (typeof cd === 'string') { try { cd = JSON.parse(cd); } catch(e) { cd = {}; } }
+                let items = cd.items || [];
+                if (!Array.isArray(items)) items = Object.values(items);
+                items = items.filter(Boolean);
+                items.push({
+                    id: x.id,
+                    damage: x.metadata,
+                    numeric_id: x.numeric_id,
+                    name: x.name,
+                    icon: x.icon,
+                    keep_amount: keep,
+                    craft_amount: craftAmount,
+                    enabled: true,
+                });
+                cd.items = items;
+                db.ref('crafter').set(cd)
+                    .then(() => {
+                        showToast('В автокрафт: ' + x.name, 'success');
+                        neiLog('АВТОКРАФТ ДОБАВЛЕН',
+                            '«' + x.name + '» (id=' + x.id + ', хранить=' + keep + ', заказ_по=' + craftAmount + ')');
+                    })
+                    .catch(e => { console.error(e); showToast('Ошибка добавления', 'error'); });
+            });
+        };
+
+        window.neiRemoveFromCrafter = function(index, name) {
+            if (!confirm('Убрать из автокрафта: ' + name + '?')) return;
+            db.ref('crafter').once('value').then((snap) => {
+                let cd = snap.val() || {};
+                if (typeof cd === 'string') { try { cd = JSON.parse(cd); } catch(e) { cd = {}; } }
+                let items = cd.items || [];
+                if (!Array.isArray(items)) items = Object.values(items);
+                const removed = items[Number(index)] || {};
+                items.splice(Number(index), 1);
+                cd.items = items.filter(Boolean);
+                db.ref('crafter').set(cd)
+                    .then(() => {
+                        showToast('Убран: ' + name, 'success');
+                        neiLog('АВТОКРАФТ УДАЛЁН', '«' + (removed.name || name) + '» (id=' + (removed.id || '—') + ')');
+                    })
+                    .catch(e => { console.error(e); showToast('Ошибка удаления', 'error'); });
+            });
+        };
+
         window.SHOP = {
             raw: [],                  // [{idx: number, item: {...}}]
             allCats: [],              // массив существующих категорий (sorted)
@@ -628,6 +960,7 @@
             loaded: false,
             loading: false,
             shopMap: new Map(),
+            crafterMap: new Map(),
         };
 
         // Уникальный ключ предмета: registry id + damage(=metadata). По нему матчим каталог ↔ shop.
@@ -727,7 +1060,7 @@
                 clearTimeout(to);
                 to = setTimeout(neiApplyFilters, 120);
             });
-            for (const id of ['nei-onlyPriced','nei-onlyWithIcon','nei-dedupId','nei-onlyInShop','nei-onlyNotInShop']) {
+            for (const id of ['nei-onlyPriced','nei-onlyWithIcon','nei-dedupId','nei-onlyInShop','nei-onlyNotInShop','nei-onlyInCrafter','nei-onlyNotInCrafter']) {
                 document.getElementById(id).addEventListener('change', neiApplyFilters);
             }
             document.getElementById('nei-sort').addEventListener('change', neiApplyFilters);
@@ -748,6 +1081,8 @@
             const dedup = document.getElementById('nei-dedupId').checked;
             const onlyInShop = document.getElementById('nei-onlyInShop').checked;
             const onlyNotInShop = document.getElementById('nei-onlyNotInShop').checked;
+            const onlyInCrafter = document.getElementById('nei-onlyInCrafter').checked;
+            const onlyNotInCrafter = document.getElementById('nei-onlyNotInCrafter').checked;
             const sortKey = document.getElementById('nei-sort').value;
             const sel = window.NEI.selectedMods;
 
@@ -759,6 +1094,8 @@
             if (onlyWithIcon) arr = arr.filter((x) => x.icon);
             if (onlyInShop) arr = arr.filter((x) => window.NEI.shopMap.has(neiItemKey(x)));
             if (onlyNotInShop) arr = arr.filter((x) => !window.NEI.shopMap.has(neiItemKey(x)));
+            if (onlyInCrafter) arr = arr.filter((x) => window.NEI.crafterMap.has(neiItemKey(x)));
+            if (onlyNotInCrafter) arr = arr.filter((x) => !window.NEI.crafterMap.has(neiItemKey(x)));
 
             if (q) {
                 arr = arr.filter((x) => {
@@ -849,15 +1186,30 @@
                 icon: x.icon || '', min_price: x.min_price ?? null
             }))));
 
-            const btn = inShop
+            const btnShop = inShop
                 ? '<button onclick="neiRemoveFromShop(' + shopIdx + ', \'' + neiEscAttr(name) + '\')" '
-                  + 'class="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-medium py-1.5 px-3 rounded transition">'
-                  + 'В магазине ✕</button>'
+                  + 'class="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-medium py-1 px-2 rounded transition">'
+                  + 'Шоп ✕</button>'
                 : '<button onclick="neiAddToShop(\'' + payload + '\')" '
-                  + 'class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1.5 px-3 rounded transition">'
-                  + '+ В магазин</button>';
+                  + 'class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1 px-2 rounded transition">'
+                  + '+ Шоп</button>';
 
-            const rowBg = inShop ? 'bg-green-900/10' : '';
+            const inCrafter = key && window.NEI.crafterMap && window.NEI.crafterMap.has(key);
+            const crafterIdx = inCrafter ? window.NEI.crafterMap.get(key) : -1;
+            const btnCrafter = inCrafter
+                ? '<button onclick="neiRemoveFromCrafter(' + crafterIdx + ', \'' + neiEscAttr(name) + '\')" '
+                  + 'class="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-medium py-1 px-2 rounded transition">'
+                  + 'Крафт ✕</button>'
+                : '<button onclick="neiAddToCrafter(\'' + payload + '\')" '
+                  + 'class="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium py-1 px-2 rounded transition">'
+                  + '+ Крафт</button>';
+
+            const btn = '<div class="flex flex-col gap-1 w-full">' + btnShop + btnCrafter + '</div>';
+
+            const rowBg = (inShop && inCrafter) ? 'bg-purple-900/10'
+                        : inShop                ? 'bg-green-900/10'
+                        : inCrafter             ? 'bg-purple-900/10'
+                        : '';
 
             return '<div class="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 px-4 py-3 hover:bg-gray-750 transition ' + rowBg + '">'
                 + '<div class="w-12 flex-none">' + icon + '</div>'
