@@ -80,25 +80,41 @@ function gui.drawStatic(user, timer, cart_count, top3, shopName)
 end
 
 -- Поиск рисуется отдельной полосой над категориями. Виден всегда.
-function gui.drawSearch(search_query)
+-- focused=true → инпут активен, ввод идёт прямо в него (без модала).
+function gui.drawSearch(search_query, focused)
     local sq = search_query or ""
     local y = 4
     local leftW = rightColX - 1
-    -- общий фон полосы поиска
     rect(1, y, leftW, 1, gui.COLORS.bg)
-    -- лейбл
     local lbl = " ПОИСК: "
     text(2, y, lbl, gui.COLORS.label, gui.COLORS.bg)
     local inputX = 2 + unicode.len(lbl)
-    -- ширина инпута (с учётом возможной кнопки сброса)
-    local resetW = (sq ~= "") and 6 or 0
+    local resetW = (sq ~= "") and 8 or 0
     local inputW = leftW - inputX - resetW - 2
     if inputW < 10 then inputW = 10 end
-    local inputLabel = (sq == "") and "[нажмите, чтобы ввести запрос]" or sq
-    local inputBg = (sq == "") and gui.COLORS.inputBg or gui.COLORS.btnActive
-    local inputFg = (sq == "") and gui.COLORS.label or gui.COLORS.text
-    -- кликабельный «инпут»
-    local shown = unicode.sub(inputLabel, 1, inputW - 2)
+
+    local placeholder = "[кликни и печатай — esc/enter чтобы закончить]"
+    local inputBg, inputFg, shownRaw
+    if focused then
+        inputBg = gui.COLORS.inputFocus
+        inputFg = gui.COLORS.text
+        shownRaw = sq .. "_"  -- курсор
+    elseif sq == "" then
+        inputBg = gui.COLORS.inputBg
+        inputFg = gui.COLORS.label
+        shownRaw = placeholder
+    else
+        inputBg = gui.COLORS.btnActive
+        inputFg = gui.COLORS.text
+        shownRaw = sq
+    end
+
+    -- если текст шире инпута — обрезаем слева, чтобы был виден хвост с курсором
+    local shown = shownRaw
+    if unicode.len(shown) > inputW - 2 then
+        shown = unicode.sub(shown, unicode.len(shown) - (inputW - 3))
+    end
+
     rect(inputX, y, inputW, 1, inputBg)
     text(inputX + 1, y, shown, inputFg, inputBg)
     gui.buttons["search"] = {x = inputX, y = y, w = inputW, h = 1}
@@ -108,7 +124,7 @@ function gui.drawSearch(search_query)
 end
 
 function gui.drawCategories(categories, active_cat)
-    local x = 2; local y = 5
+    local x = 2; local y = 6  -- +1 строка отступа от поиска
     for i, cat in ipairs(categories) do
         local catW = unicode.len(cat) + 4
         local bg = (cat == active_cat) and gui.COLORS.btnActive or gui.COLORS.btn
@@ -118,15 +134,15 @@ function gui.drawCategories(categories, active_cat)
 end
 
 function gui.drawItems(pageItems, page, maxPage)
-    rect(1, 7, rightColX - 1, H - 6, gui.COLORS.bg)
+    rect(1, 8, rightColX - 1, H - 7, gui.COLORS.bg)
     local margin = 2; local cols = 4;
     local tileW = math.floor((rightColX - (cols + 1) * margin) / cols); local tileH = 6
     local row, col = 0, 0
-    
+
     for _, pItem in ipairs(pageItems) do
         local item = pItem.item
         local id = pItem.origIdx
-        local x = margin + col * (tileW + margin); local y = 7 + row * (tileH + 1)
+        local x = margin + col * (tileW + margin); local y = 8 + row * (tileH + 1)
         
         rect(x, y, tileW, tileH, gui.COLORS.tileBg)
         center(x, y, tileW, item.name, gui.COLORS.text, gui.COLORS.tileHeader)

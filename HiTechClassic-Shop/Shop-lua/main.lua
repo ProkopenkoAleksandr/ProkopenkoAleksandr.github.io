@@ -43,6 +43,7 @@ local cart = {}
 local ed_data = {}
 local log_filter = ""
 local search_query = ""
+local search_focus = false
 
 local currentPage = 1
 local ITEMS_PER_PAGE = 20
@@ -247,7 +248,7 @@ local function refreshScreen()
     if state == "shop" then
         me.updateStock(shop_items)
         gui.drawStatic(currentUser, currentUser and idleTimer or nil, #cart, getTop3Players(), shop_name)
-        gui.drawSearch(search_query)
+        gui.drawSearch(search_query, search_focus)
         gui.drawCategories(categories, active_category)
         local pItems, maxPage = getPageItems()
         gui.drawItems(pItems, currentPage, maxPage)
@@ -350,6 +351,30 @@ local function shopTick()
                 showMsg("ОТКАЗАНО В ДОСТУПЕ", "Только администратор может закрыть программу!", true, 3)
             end
             
+        elseif ev == "key_down" and state == "shop" and search_focus then
+            local char = arg1; local code = arg2
+            if currentUser then idleTimer = 30 end
+            if code == 28 or code == 1 then
+                -- enter / esc — снимаем фокус
+                search_focus = false
+            elseif code == 14 then
+                -- backspace
+                if unicode.len(search_query) > 0 then
+                    search_query = unicode.sub(search_query, 1, -2)
+                    currentPage = 1
+                end
+            elseif char and char >= 32 then
+                search_query = search_query .. unicode.char(char)
+                currentPage = 1
+            end
+            refreshScreen()
+
+        elseif ev == "clipboard" and state == "shop" and search_focus then
+            if currentUser then idleTimer = 30 end
+            search_query = search_query .. tostring(arg1 or "")
+            currentPage = 1
+            refreshScreen()
+
         elseif ev == "key_down" and state == "editor" then
             local char = arg1; local code = arg2
             local val = (ed_data.focus == "name") and ed_data.name or tostring(ed_data.price)
@@ -387,6 +412,8 @@ local function shopTick()
                 local action = gui.checkClick(x, y)
                 if action then
                     computer.beep(1000, 0.05)
+                    -- любой клик кроме самого инпута поиска снимает фокус
+                    if action ~= "search" and action ~= "clear_search" then search_focus = false end
                     
                     if action == "page_prev" then currentPage = currentPage - 1; refreshScreen()
                     elseif action == "page_next" then currentPage = currentPage + 1; refreshScreen()
@@ -512,11 +539,12 @@ local function shopTick()
                         elseif action == "logout" then currentUser = nil; cart = {}; currentPage = 1; refreshScreen()
                         elseif action == "admin_panel" then state = "admin_item"; adminPage = 1; refreshScreen()
                         elseif action == "search" then
-                            ed_data = {target = "search", focus = "name", name = search_query, isItem = false}
-                            state = "editor"; refreshScreen()
+                            -- клик по инпуту: ставим/снимаем фокус, дальше ввод идёт прямо в строку
+                            search_focus = not search_focus; refreshScreen()
                         elseif action == "clear_search" then
-                            search_query = ""; currentPage = 1; refreshScreen()
-                        elseif action:match("cat_") then active_category = action:gsub("cat_", ""); currentPage = 1; refreshScreen()
+                            search_query = ""; currentPage = 1; search_focus = true; refreshScreen()
+                        elseif action:match("cat_") then
+                            active_category = action:gsub("cat_", ""); currentPage = 1; search_focus = false; refreshScreen()
                         elseif action == "sell_all" then
                             if not currentUser then showMsg("ОШИБКА", "Авторизуйтесь!", true)
                             else
