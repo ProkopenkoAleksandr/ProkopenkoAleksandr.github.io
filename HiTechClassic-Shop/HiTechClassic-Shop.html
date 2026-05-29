@@ -8,6 +8,34 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        .bg-gray-750 { background-color: #2d3441; }
+        .hover\:bg-gray-750:hover { background-color: #2d3441; }
+        .item-icon {
+            width: 32px; height: 32px;
+            image-rendering: pixelated;
+            display: block; background: #0b0b0b;
+            border: 1px solid #374151; border-radius: 2px;
+        }
+        .item-icon-empty {
+            width: 32px; height: 32px;
+            background: #1f2937;
+            border: 1px dashed #4b5563; border-radius: 2px;
+            display: flex; align-items: center; justify-content: center;
+            color: #4b5563; font-size: 10px;
+        }
+        .mod-chip {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 3px 8px; background: #374151;
+            border: 1px solid #4b5563; border-radius: 4px;
+            font-size: 11px; cursor: pointer; user-select: none;
+            white-space: nowrap; transition: background 0.12s;
+        }
+        .mod-chip:hover { background: #4b5563; }
+        .mod-chip input { margin: 0; }
+        .tabular { font-variant-numeric: tabular-nums; }
+        .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    </style>
 </head>
 <body class="bg-gray-900 text-gray-200 font-sans antialiased min-h-screen flex flex-col">
 
@@ -40,6 +68,7 @@
                         <div class="hidden sm:flex space-x-2">
                             <button onclick="switchTab('users')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium bg-gray-900 text-white" id="tab-users">Игроки</button>
                             <button onclick="switchTab('shop')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-shop">Товары</button>
+                            <button onclick="switchTab('nei')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-nei">NEI</button>
                             <button onclick="switchTab('logs')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-logs">Логи</button>
                         </div>
                     </div>
@@ -51,6 +80,7 @@
                 <div class="sm:hidden pb-3 pt-1 flex space-x-2 overflow-x-auto no-scrollbar">
                     <button onclick="switchTab('users')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium bg-gray-900 text-white" id="tab-users-mob">Игроки</button>
                     <button onclick="switchTab('shop')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-shop-mob">Товары</button>
+                    <button onclick="switchTab('nei')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-nei-mob">NEI</button>
                     <button onclick="switchTab('logs')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-logs-mob">Логи</button>
                 </div>
             </div>
@@ -80,6 +110,85 @@
                     </div>
                     <div id="shop-list" class="divide-y divide-gray-700"></div>
                 </div>
+            </div>
+
+            <div id="content-nei" class="tab-content hidden">
+                <div class="flex items-center justify-between mb-4 gap-4 flex-wrap">
+                    <h2 class="text-2xl font-bold">NEI — Каталог предметов</h2>
+                    <div id="nei-stats" class="text-sm text-gray-400">не загружено</div>
+                </div>
+
+                <div class="bg-gray-800 shadow rounded-lg border border-gray-700 mb-6 p-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
+                        <input id="nei-search" type="text" placeholder="Поиск по названию / id / numeric_id / orig_label…"
+                            class="flex-1 bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">
+                        <select id="nei-sort" class="bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">
+                            <option value="name_asc">Название A→Я</option>
+                            <option value="name_desc">Название Я→A</option>
+                            <option value="price_asc">Цена ↑</option>
+                            <option value="price_desc">Цена ↓</option>
+                            <option value="id_asc">ID A→Я</option>
+                            <option value="mod_asc">Мод A→Я</option>
+                        </select>
+                        <select id="nei-pageSize" class="bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">
+                            <option value="50">50 / стр</option>
+                            <option value="100" selected>100 / стр</option>
+                            <option value="250">250 / стр</option>
+                            <option value="500">500 / стр</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-wrap gap-x-5 gap-y-2 mb-3 text-sm">
+                        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input id="nei-onlyPriced" type="checkbox" class="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500">
+                            <span>только с минималкой</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input id="nei-onlyWithIcon" type="checkbox" class="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500">
+                            <span>только с иконкой</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input id="nei-dedupId" type="checkbox" class="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500">
+                            <span>скрыть дубли по ID</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input id="nei-onlyInShop" type="checkbox" class="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500">
+                            <span>только из магазина</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input id="nei-onlyNotInShop" type="checkbox" class="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500">
+                            <span>только не в магазине</span>
+                        </label>
+                    </div>
+                    <details open class="mt-2">
+                        <summary class="cursor-pointer text-sm text-gray-300 hover:text-white mb-2">
+                            Моды (<span id="nei-modSelectedCount">все</span>)
+                        </summary>
+                        <div class="flex gap-2 mb-2">
+                            <button id="nei-modAll" type="button" class="px-3 py-1 rounded text-xs font-medium text-gray-200 bg-gray-700 hover:bg-gray-600 transition">все</button>
+                            <button id="nei-modNone" type="button" class="px-3 py-1 rounded text-xs font-medium text-gray-200 bg-gray-700 hover:bg-gray-600 transition">снять</button>
+                            <button id="nei-modInvert" type="button" class="px-3 py-1 rounded text-xs font-medium text-gray-200 bg-gray-700 hover:bg-gray-600 transition">инвертировать</button>
+                        </div>
+                        <div id="nei-modList" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-2 bg-gray-900 border border-gray-700 rounded"></div>
+                    </details>
+                </div>
+
+                <div class="bg-gray-800 shadow rounded-lg overflow-hidden border border-gray-700">
+                    <div class="hidden md:flex bg-gray-700 px-4 py-3 text-xs font-medium text-gray-300 uppercase tracking-wider gap-4 items-center">
+                        <div class="w-12">Иконка</div>
+                        <div class="flex-1 min-w-0">Название</div>
+                        <div class="w-52 min-w-0">ID</div>
+                        <div class="w-16 text-right">#</div>
+                        <div class="w-32">Мод</div>
+                        <div class="w-12 text-right">Meta</div>
+                        <div class="w-24 text-right">Мин. цена</div>
+                        <div class="w-[120px] text-center">Магазин</div>
+                    </div>
+                    <div id="nei-rows" class="divide-y divide-gray-700">
+                        <div class="p-6 text-center text-gray-500 text-sm">Откройте вкладку — каталог загрузится автоматически.</div>
+                    </div>
+                </div>
+
+                <div id="nei-pager" class="flex items-center justify-center gap-2 mt-6 flex-wrap"></div>
             </div>
 
             <div id="content-logs" class="tab-content hidden">
@@ -119,8 +228,11 @@
                 email = email + '@shop.local';
             }
             
-            auth.signInWithEmailAndPassword(email, password).catch(() => {
-                document.getElementById('login-error').classList.remove('hidden');
+            auth.signInWithEmailAndPassword(email, password).catch((err) => {
+                console.error('Auth error:', err.code, err.message);
+                const errBox = document.getElementById('login-error');
+                errBox.innerText = `Ошибка входа: ${err.code} — ${err.message}`;
+                errBox.classList.remove('hidden');
             });
         });
 
@@ -138,6 +250,7 @@
             if(document.getElementById('tab-' + tabId + '-mob')) {
                 document.getElementById('tab-' + tabId + '-mob').classList.add('bg-gray-900', 'text-white');
             }
+            if (tabId === 'nei') neiInitOnce();
         }
 
         function loadData() {
@@ -172,6 +285,19 @@
                 let shopData = snapshot.val() || {};
                 if (typeof shopData === 'string') { try { shopData = JSON.parse(shopData); } catch(e) { shopData = {}; } }
                 const itemsRaw = shopData.items || [];
+                // === NEI: строим карту "ключ предмета → индекс в shop.items" для проверки наличия ===
+                window.NEI.shopMap = new Map();
+                Object.keys(itemsRaw).forEach((k) => {
+                    const it = itemsRaw[k];
+                    if (!it) return;
+                    const key = neiItemKey(it);
+                    if (key) window.NEI.shopMap.set(key, Number(k));
+                });
+                // === кэш категорий для подсказки в prompt ===
+                let cats = shopData.categories || [];
+                if (!Array.isArray(cats)) cats = Object.values(cats);
+                window.NEI.categories = cats.filter((c) => c != null && c !== '');
+                if (window.NEI.loaded) neiRender();
                 const list = document.getElementById('shop-list');
                 list.innerHTML = '';
                 Object.keys(itemsRaw).forEach(key => {
@@ -275,6 +401,408 @@
                 }
             });
         }
+
+        // =====================================================================
+        // NEI tab — каталог предметов с интеграцией Firebase shop
+        // =====================================================================
+        // Дефолтный набор включённых модов при первом открытии вкладки NEI.
+        // Можно расширить — мод добавится только если он реально есть в JSON.
+        const NEI_DEFAULT_MODS = [
+            'appliedenergistics2','IC2','minecraft','MineFactoryReloaded','ThermalExpansion',
+            'EnderIO','DraconicEvolution','hitechclassicmod','AdvancedSolarPanel','Avaritia',
+            'GraviSuite','ae2additions','ae2stuff','PowerUtils','DragonsRadioMod','avaritiaddons'
+        ];
+
+        window.NEI = {
+            all: [],
+            modCounts: {},
+            selectedMods: new Set(),
+            filtered: [],
+            page: 1,
+            pageSize: 100,
+            loaded: false,
+            loading: false,
+            shopMap: new Map(),
+        };
+
+        // Уникальный ключ предмета: registry id + damage(=metadata). По нему матчим каталог ↔ shop.
+        // В каталоге поле зовётся metadata (как в Forge 1.7.10 API), в shop — damage.
+        function neiItemKey(x) {
+            const id = x.id || x.name;
+            if (!id) return null;
+            const m = (x.damage != null) ? x.damage : ((x.metadata != null) ? x.metadata : 0);
+            return id + '|m' + m;
+        }
+
+        async function neiInitOnce() {
+            if (window.NEI.loaded || window.NEI.loading) return;
+            window.NEI.loading = true;
+            document.getElementById('nei-stats').textContent = 'Загрузка JSON…';
+            document.getElementById('nei-rows').innerHTML =
+                '<div class="p-6 text-center text-gray-500 text-sm">Загрузка JSON (32 МБ)…</div>';
+            try {
+                const r = await fetch('./all_items_with_prices.json');
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                window.NEI.all = await r.json();
+            } catch (e) {
+                document.getElementById('nei-rows').innerHTML =
+                    '<div class="p-6 text-red-400 text-sm">Не удалось загрузить JSON: ' + e.message
+                    + '<br>JSON должен лежать в ~/Downloads/all_items_with_prices.json. Открой сайт через локальный HTTP-сервер.</div>';
+                window.NEI.loading = false;
+                return;
+            }
+            for (const x of window.NEI.all) {
+                const m = x.mod_id || '?';
+                window.NEI.modCounts[m] = (window.NEI.modCounts[m] || 0) + 1;
+            }
+            // По умолчанию выбираем только моды из NEI_DEFAULT_MODS, которые реально есть в данных.
+            // Если ни одного не нашлось (теоретически — другой репак) — fallback на все.
+            const present = NEI_DEFAULT_MODS.filter((m) => m in window.NEI.modCounts);
+            const initial = present.length ? present : Object.keys(window.NEI.modCounts);
+            for (const m of initial) window.NEI.selectedMods.add(m);
+            neiRenderModList();
+            neiBindControls();
+            window.NEI.loaded = true;
+            window.NEI.loading = false;
+            neiApplyFilters();
+        }
+
+        function neiRenderModList() {
+            const wrap = document.getElementById('nei-modList');
+            const mods = Object.keys(window.NEI.modCounts).sort(
+                (a, b) => window.NEI.modCounts[b] - window.NEI.modCounts[a]
+            );
+            wrap.innerHTML = '';
+            for (const m of mods) {
+                const lab = document.createElement('label');
+                lab.className = 'mod-chip';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = window.NEI.selectedMods.has(m);
+                cb.dataset.mod = m;
+                cb.className = 'rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500';
+                cb.addEventListener('change', () => {
+                    if (cb.checked) window.NEI.selectedMods.add(m);
+                    else window.NEI.selectedMods.delete(m);
+                    neiUpdateModSelectedCount();
+                    neiApplyFilters();
+                });
+                const name = document.createElement('span');
+                name.textContent = m;
+                const cnt = document.createElement('span');
+                cnt.className = 'mod-count text-gray-400 tabular';
+                cnt.textContent = window.NEI.modCounts[m];
+                lab.append(cb, name, cnt);
+                wrap.appendChild(lab);
+            }
+            neiUpdateModSelectedCount();
+        }
+
+        function neiUpdateModSelectedCount() {
+            const total = Object.keys(window.NEI.modCounts).length;
+            const sel = window.NEI.selectedMods.size;
+            document.getElementById('nei-modSelectedCount').textContent = (sel === total) ? 'все' : (sel + ' из ' + total);
+        }
+
+        function neiSetAllMods(predicate) {
+            window.NEI.selectedMods.clear();
+            for (const m of Object.keys(window.NEI.modCounts)) {
+                if (predicate(m)) window.NEI.selectedMods.add(m);
+            }
+            for (const cb of document.querySelectorAll('#nei-modList input[type=checkbox]')) {
+                cb.checked = window.NEI.selectedMods.has(cb.dataset.mod);
+            }
+            neiUpdateModSelectedCount();
+            neiApplyFilters();
+        }
+
+        function neiBindControls() {
+            let to;
+            document.getElementById('nei-search').addEventListener('input', () => {
+                clearTimeout(to);
+                to = setTimeout(neiApplyFilters, 120);
+            });
+            for (const id of ['nei-onlyPriced','nei-onlyWithIcon','nei-dedupId','nei-onlyInShop','nei-onlyNotInShop']) {
+                document.getElementById(id).addEventListener('change', neiApplyFilters);
+            }
+            document.getElementById('nei-sort').addEventListener('change', neiApplyFilters);
+            document.getElementById('nei-pageSize').addEventListener('change', () => {
+                window.NEI.pageSize = parseInt(document.getElementById('nei-pageSize').value, 10) || 100;
+                window.NEI.page = 1;
+                neiRender();
+            });
+            document.getElementById('nei-modAll').addEventListener('click', () => neiSetAllMods(() => true));
+            document.getElementById('nei-modNone').addEventListener('click', () => neiSetAllMods(() => false));
+            document.getElementById('nei-modInvert').addEventListener('click', () => neiSetAllMods((m) => !window.NEI.selectedMods.has(m)));
+        }
+
+        function neiApplyFilters() {
+            const q = document.getElementById('nei-search').value.trim().toLowerCase();
+            const onlyPriced = document.getElementById('nei-onlyPriced').checked;
+            const onlyWithIcon = document.getElementById('nei-onlyWithIcon').checked;
+            const dedup = document.getElementById('nei-dedupId').checked;
+            const onlyInShop = document.getElementById('nei-onlyInShop').checked;
+            const onlyNotInShop = document.getElementById('nei-onlyNotInShop').checked;
+            const sortKey = document.getElementById('nei-sort').value;
+            const sel = window.NEI.selectedMods;
+
+            let arr = window.NEI.all;
+            if (sel.size !== Object.keys(window.NEI.modCounts).length) {
+                arr = arr.filter((x) => sel.has(x.mod_id || '?'));
+            }
+            if (onlyPriced) arr = arr.filter((x) => x.min_price != null);
+            if (onlyWithIcon) arr = arr.filter((x) => x.icon);
+            if (onlyInShop) arr = arr.filter((x) => window.NEI.shopMap.has(neiItemKey(x)));
+            if (onlyNotInShop) arr = arr.filter((x) => !window.NEI.shopMap.has(neiItemKey(x)));
+
+            if (q) {
+                arr = arr.filter((x) => {
+                    const n = (x.name || '').toLowerCase();
+                    const id = (x.id || '').toLowerCase();
+                    const orig = (x.orig_label || '').toLowerCase();
+                    const num = x.numeric_id != null ? String(x.numeric_id) : '';
+                    return n.includes(q) || id.includes(q) || orig.includes(q) || num === q;
+                });
+            }
+
+            arr = arr.slice();
+            switch (sortKey) {
+                case 'name_asc':   arr.sort((a,b) => (a.name||'').localeCompare(b.name||'','ru')); break;
+                case 'name_desc':  arr.sort((a,b) => (b.name||'').localeCompare(a.name||'','ru')); break;
+                case 'price_asc':  arr.sort((a,b) => (a.min_price ?? Infinity) - (b.min_price ?? Infinity)); break;
+                case 'price_desc': arr.sort((a,b) => (b.min_price ?? -Infinity) - (a.min_price ?? -Infinity)); break;
+                case 'id_asc':     arr.sort((a,b) => (a.id||'').localeCompare(b.id||'')); break;
+                case 'mod_asc':    arr.sort((a,b) => {
+                                     const c = (a.mod_id||'').localeCompare(b.mod_id||'');
+                                     return c !== 0 ? c : (a.name||'').localeCompare(b.name||'','ru');
+                                   }); break;
+            }
+
+            if (dedup) {
+                const seen = new Set();
+                const uniq = [];
+                for (const x of arr) {
+                    const k = x.id || '';
+                    if (seen.has(k)) continue;
+                    seen.add(k);
+                    uniq.push(x);
+                }
+                arr = uniq;
+            }
+
+            window.NEI.filtered = arr;
+            window.NEI.page = 1;
+            neiRender();
+        }
+
+        function neiRender() {
+            if (!window.NEI.loaded) return;
+            const total = window.NEI.filtered.length;
+            const totalPages = Math.max(1, Math.ceil(total / window.NEI.pageSize));
+            if (window.NEI.page > totalPages) window.NEI.page = totalPages;
+            const from = (window.NEI.page - 1) * window.NEI.pageSize;
+            const to = Math.min(from + window.NEI.pageSize, total);
+
+            const inShop = window.NEI.shopMap.size;
+            document.getElementById('nei-stats').textContent =
+                neiFmt(total) + ' / ' + neiFmt(window.NEI.all.length)
+                + ' • в магазине ' + neiFmt(inShop)
+                + ' • стр. ' + window.NEI.page + '/' + totalPages;
+
+            const out = [];
+            for (let i = from; i < to; i++) out.push(neiRowHtml(window.NEI.filtered[i]));
+            const tbody = document.getElementById('nei-rows');
+            tbody.innerHTML = out.length
+                ? out.join('')
+                : '<div class="p-6 text-center text-gray-500 text-sm">Ничего не найдено</div>';
+            neiRenderPager(totalPages);
+        }
+
+        function neiRowHtml(x) {
+            const key = neiItemKey(x);
+            const inShop = key && window.NEI.shopMap.has(key);
+            const shopIdx = inShop ? window.NEI.shopMap.get(key) : -1;
+
+            const icon = x.icon
+                ? '<img loading="lazy" src="./item_icons/' + neiEscAttr(x.icon) + '" alt="" class="item-icon">'
+                : '<div class="item-icon-empty">—</div>';
+            const name = neiEsc(x.name || '');
+            const orig = x.orig_label
+                ? '<div class="text-[11px] text-gray-500 mono mt-0.5 truncate">' + neiEsc(x.orig_label) + '</div>'
+                : '';
+            const id = neiEsc(x.id || '');
+            const numId = (x.numeric_id != null && x.numeric_id !== -1) ? x.numeric_id : '';
+            const mod = neiEsc(x.mod_id || '');
+            const meta = x.metadata != null ? x.metadata : '';
+            const priceText = x.min_price != null ? neiFmt(x.min_price) : '—';
+            const priceClass = x.min_price != null ? 'text-green-400 font-semibold' : 'text-gray-600';
+
+            // payload для add — кодируем base64 чтобы безопасно передать в onclick
+            const payload = btoa(unescape(encodeURIComponent(JSON.stringify({
+                id: x.id || '', name: x.name || '', mod_id: x.mod_id || '',
+                metadata: x.metadata ?? 0, numeric_id: x.numeric_id ?? -1,
+                icon: x.icon || '', min_price: x.min_price ?? null
+            }))));
+
+            const btn = inShop
+                ? '<button onclick="neiRemoveFromShop(' + shopIdx + ', \'' + neiEscAttr(name) + '\')" '
+                  + 'class="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-medium py-1.5 px-3 rounded transition">'
+                  + 'В магазине ✕</button>'
+                : '<button onclick="neiAddToShop(\'' + payload + '\')" '
+                  + 'class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1.5 px-3 rounded transition">'
+                  + '+ В магазин</button>';
+
+            const rowBg = inShop ? 'bg-green-900/10' : '';
+
+            return '<div class="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 px-4 py-3 hover:bg-gray-750 transition ' + rowBg + '">'
+                + '<div class="w-12 flex-none">' + icon + '</div>'
+                + '<div class="flex-1 min-w-0">'
+                + '  <div class="text-white font-medium truncate">' + name + '</div>'
+                + '  ' + orig
+                + '</div>'
+                + '<div class="md:w-52 min-w-0"><div class="md:hidden text-[10px] uppercase text-gray-500 mb-0.5">ID</div>'
+                + '<div class="mono text-[11px] text-blue-300 truncate">' + id + '</div></div>'
+                + '<div class="md:w-16 md:text-right"><div class="md:hidden text-[10px] uppercase text-gray-500 mb-0.5">#</div>'
+                + '<div class="mono tabular text-[11px] text-purple-300">' + numId + '</div></div>'
+                + '<div class="md:w-32"><div class="md:hidden text-[10px] uppercase text-gray-500 mb-0.5">Мод</div>'
+                + '<div class="text-[11px] text-amber-300 truncate">' + mod + '</div></div>'
+                + '<div class="md:w-12 md:text-right"><div class="md:hidden text-[10px] uppercase text-gray-500 mb-0.5">Meta</div>'
+                + '<div class="mono tabular text-[11px] text-gray-400">' + meta + '</div></div>'
+                + '<div class="md:w-24 md:text-right"><div class="md:hidden text-[10px] uppercase text-gray-500 mb-0.5">Мин. цена</div>'
+                + '<div class="tabular ' + priceClass + '">' + priceText + '</div></div>'
+                + '<div class="md:w-[120px] flex-none">' + btn + '</div>'
+                + '</div>';
+        }
+
+        function neiRenderPager(totalPages) {
+            const wrap = document.getElementById('nei-pager');
+            const p = window.NEI.page;
+            wrap.innerHTML = '';
+            const mkBtn = (label, disabled, onClick) => {
+                const b = document.createElement('button');
+                b.textContent = label;
+                b.disabled = disabled;
+                b.className = 'bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm font-medium px-3 py-1.5 rounded transition disabled:opacity-40 disabled:cursor-default';
+                if (!disabled) b.addEventListener('click', onClick);
+                return b;
+            };
+            wrap.append(mkBtn('« первая', p <= 1, () => { window.NEI.page = 1; neiRender(); }));
+            wrap.append(mkBtn('‹ назад',  p <= 1, () => { window.NEI.page--;   neiRender(); }));
+            const info = document.createElement('span');
+            info.className = 'tabular text-sm text-gray-400 px-3';
+            info.textContent = p + ' / ' + totalPages;
+            wrap.append(info);
+            wrap.append(mkBtn('вперёд ›', p >= totalPages, () => { window.NEI.page++;     neiRender(); }));
+            wrap.append(mkBtn('последняя »', p >= totalPages, () => { window.NEI.page = totalPages; neiRender(); }));
+        }
+
+        // === Действия с Firebase shop ===
+
+        window.neiAddToShop = function(payloadB64) {
+            const x = JSON.parse(decodeURIComponent(escape(atob(payloadB64))));
+            const defaultPrice = x.min_price != null ? Math.max(1, Math.floor(x.min_price)) : 0;
+            const priceStr = prompt('Цена в магазине для "' + x.name + '" (мин.цена: ' + (x.min_price ?? '—') + ')', String(defaultPrice));
+            if (priceStr === null) return;
+            const price = Number(priceStr);
+            if (!Number.isFinite(price) || price < 0) { showToast('Некорректная цена', 'error'); return; }
+            const existingCats = (window.NEI.categories || []).filter((c) => c !== 'ВСЕ');
+            const hint = existingCats.length
+                ? '\n\nСуществующие категории:\n  • ' + existingCats.join('\n  • ')
+                  + '\n\nЕсли введёшь новую — она создастся автоматически.'
+                : '';
+            const category = prompt('Категория для "' + x.name + '"' + hint, x.mod_id || 'misc');
+            if (category === null) return;
+            if (!category.trim()) { showToast('Категория не может быть пустой', 'error'); return; }
+
+            db.ref('shop').once('value').then((snapshot) => {
+                let shopData = snapshot.val() || {};
+                if (typeof shopData === 'string') { try { shopData = JSON.parse(shopData); } catch(e) { shopData = {}; } }
+                let items = shopData.items || [];
+                if (!Array.isArray(items)) items = Object.values(items);
+                items = items.filter(Boolean);
+                items.push({
+                    name: x.name,
+                    category: category,
+                    price: price,
+                    // дополнительные поля для матча с каталогом
+                    id: x.id,
+                    numeric_id: x.numeric_id,
+                    damage: x.metadata,
+                    icon: x.icon
+                });
+                shopData.items = items;
+
+                // === Проверяем категорию: если её нет в shop.categories — добавляем ===
+                let cats = shopData.categories || [];
+                if (!Array.isArray(cats)) cats = Object.values(cats);
+                cats = cats.filter((c) => c != null && c !== '');
+                const catNew = !cats.includes(category);
+                if (catNew) cats.push(category);
+                shopData.categories = cats;
+
+                db.ref('shop').set(shopData)
+                    .then(() => {
+                        showToast(catNew
+                            ? ('Добавлено: ' + x.name + ' (создана категория «' + category + '»)')
+                            : ('Добавлено: ' + x.name), 'success');
+                        if (catNew) {
+                            neiLog('КАТЕГОРИЯ СОЗДАНА', 'Категория: «' + category + '»');
+                        }
+                        const details = '«' + x.name + '»'
+                            + ' (id=' + (x.id || '—')
+                            + ', damage=' + (x.metadata ?? 0)
+                            + ', цена=' + price
+                            + ', категория=«' + category + '»)';
+                        neiLog('ТОВАР ДОБАВЛЕН', details);
+                    })
+                    .catch(e => { console.error(e); showToast('Ошибка добавления', 'error'); });
+            });
+        };
+
+        window.neiRemoveFromShop = function(index, name) {
+            if (!confirm('Удалить из магазина: ' + name + '?')) return;
+            db.ref('shop').once('value').then((snapshot) => {
+                let shopData = snapshot.val() || {};
+                if (typeof shopData === 'string') { try { shopData = JSON.parse(shopData); } catch(e) { shopData = {}; } }
+                let items = shopData.items || [];
+                if (!Array.isArray(items)) items = Object.values(items);
+                const removed = items[Number(index)] || {};
+                items.splice(Number(index), 1);
+                shopData.items = items.filter(Boolean);
+                db.ref('shop').set(shopData)
+                    .then(() => {
+                        showToast('Удалено: ' + name, 'success');
+                        const details = '«' + (removed.name || name) + '»'
+                            + ' (id=' + (removed.id || '—')
+                            + ', damage=' + (removed.damage ?? 0)
+                            + ', цена=' + (removed.price ?? '—')
+                            + ', категория=«' + (removed.category || '—') + '»)';
+                        neiLog('ТОВАР УДАЛЕН', details);
+                    })
+                    .catch(e => { console.error(e); showToast('Ошибка удаления', 'error'); });
+            });
+        };
+
+        // Пишет запись в db.ref('logs'). Формат — как у серверных логов:
+        // { user, action, time, details }. Время отдаём строкой DD.MM.YYYY HH:MM:SS.
+        function neiLog(action, details) {
+            const u = auth.currentUser;
+            const user = (u && u.email) ? u.email.replace('@shop.local', '') : 'unknown';
+            const d = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            const time = pad(d.getDate()) + '.' + pad(d.getMonth()+1) + '.' + d.getFullYear()
+                       + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+            db.ref('logs').push({ user: user, action: action, time: time, details: details })
+                .catch(e => console.error('log push failed:', e));
+        }
+
+        function neiEsc(s) {
+            return String(s).replace(/[&<>"']/g, (c) => ({
+                '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+            }[c]));
+        }
+        function neiEscAttr(s) { return neiEsc(s); }
+        function neiFmt(n) { return Number(n).toLocaleString('ru'); }
 
         function showToast(message, type) {
             const toast = document.createElement('div');
