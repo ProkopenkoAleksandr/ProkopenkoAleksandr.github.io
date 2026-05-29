@@ -1,9 +1,9 @@
 const firebaseConfig = {
-  apiKey: "AIzaSyBsc5Mz9eooW1wgp2JXrNvIfaHFewXNAzA",
-  authDomain: "me-shop-bf0a7.firebaseapp.com",
-  databaseURL: "https://me-shop-bf0a7-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "me-shop-bf0a7",
-  storageBucket: "me-shop-bf0a7.firebasestorage.app",
-  messagingSenderId: "816771532922",
-  appId: "1:816771532922:web:401b081c4623f0f3b153c3"
+  apiKey: "AIzaSyCtEamXPM9BJ-RN2Z_yjAp9wC0U0H1zF0k",
+  authDomain: "hitechclassic-1-7-10.firebaseapp.com",
+  databaseURL: "https://hitechclassic-1-7-10-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "hitechclassic-1-7-10",
+  storageBucket: "hitechclassic-1-7-10.firebasestorage.app",
+  messagingSenderId: "258711504889",
+  appId: "1:258711504889:web:9c9a578fa2cf8054125f28"
 };
