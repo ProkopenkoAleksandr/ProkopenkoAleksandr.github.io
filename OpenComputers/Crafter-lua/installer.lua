@@ -2,7 +2,7 @@
 local internet = require("internet")
 
 -- ССЫЛКА НА ТВОЙ РЕПОЗИТОРИЙ НА GITHUB (без слеша / на конце)
-local repo = "https://https://raw.githubusercontent.com/ProkopenkoAleksandr/ProkopenkoAleksandr.github.io/refs/heads/main/OpenComputers/Crafter-lua/"
+local repo = "https://raw.githubusercontent.com/ProkopenkoAleksandr/ProkopenkoAleksandr.github.io/refs/heads/main/OpenComputers/Crafter-lua/"
 
 local files = {
     "config.lua",
