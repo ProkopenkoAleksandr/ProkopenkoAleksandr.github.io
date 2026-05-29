@@ -79,23 +79,41 @@ function gui.drawStatic(user, timer, cart_count, top3, shopName)
     gui.buybackY = rY + 2
 end
 
-function gui.drawCategories(categories, active_cat, search_query)
+-- Поиск рисуется отдельной полосой над категориями. Виден всегда.
+function gui.drawSearch(search_query)
+    local sq = search_query or ""
+    local y = 4
+    local leftW = rightColX - 1
+    -- общий фон полосы поиска
+    rect(1, y, leftW, 1, gui.COLORS.bg)
+    -- лейбл
+    local lbl = " ПОИСК: "
+    text(2, y, lbl, gui.COLORS.label, gui.COLORS.bg)
+    local inputX = 2 + unicode.len(lbl)
+    -- ширина инпута (с учётом возможной кнопки сброса)
+    local resetW = (sq ~= "") and 6 or 0
+    local inputW = leftW - inputX - resetW - 2
+    if inputW < 10 then inputW = 10 end
+    local inputLabel = (sq == "") and "[нажмите, чтобы ввести запрос]" or sq
+    local inputBg = (sq == "") and gui.COLORS.inputBg or gui.COLORS.btnActive
+    local inputFg = (sq == "") and gui.COLORS.label or gui.COLORS.text
+    -- кликабельный «инпут»
+    local shown = unicode.sub(inputLabel, 1, inputW - 2)
+    rect(inputX, y, inputW, 1, inputBg)
+    text(inputX + 1, y, shown, inputFg, inputBg)
+    gui.buttons["search"] = {x = inputX, y = y, w = inputW, h = 1}
+    if sq ~= "" then
+        gui.btn("clear_search", inputX + inputW + 1, y, resetW, 1, " СБРОС ", gui.COLORS.bad)
+    end
+end
+
+function gui.drawCategories(categories, active_cat)
     local x = 2; local y = 5
     for i, cat in ipairs(categories) do
         local catW = unicode.len(cat) + 4
         local bg = (cat == active_cat) and gui.COLORS.btnActive or gui.COLORS.btn
         gui.btn("cat_"..cat, x, y, catW, 1, cat, bg)
         x = x + catW + 1
-    end
-    -- Кнопка поиска: рядом с категориями. Показывает текущий запрос, если задан.
-    local sq = search_query or ""
-    local label = (sq == "") and "ПОИСК" or ("ПОИСК: " .. unicode.sub(sq, 1, 14))
-    local sw = unicode.len(label) + 4
-    local searchBg = (sq == "") and gui.COLORS.btn or gui.COLORS.btnActive
-    gui.btn("search", x, y, sw, 1, label, searchBg)
-    x = x + sw + 1
-    if sq ~= "" then
-        gui.btn("clear_search", x, y, 5, 1, " X ", gui.COLORS.bad)
     end
 end
 
