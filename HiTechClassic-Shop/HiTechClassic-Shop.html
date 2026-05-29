@@ -100,7 +100,36 @@
             </div>
 
             <div id="content-shop" class="tab-content hidden">
-                <h2 class="text-2xl font-bold mb-4">Товары на витрине</h2>
+                <div class="flex items-center justify-between mb-4 gap-4 flex-wrap">
+                    <h2 class="text-2xl font-bold">Товары на витрине</h2>
+                    <div id="shop-stats" class="text-sm text-gray-400">—</div>
+                </div>
+
+                <div class="bg-gray-800 shadow rounded-lg border border-gray-700 mb-6 p-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
+                        <input id="shop-search" type="text" placeholder="Поиск по названию / id / категории…"
+                            class="flex-1 bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">
+                        <select id="shop-sort" class="bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">
+                            <option value="name_asc">Название A→Я</option>
+                            <option value="name_desc">Название Я→A</option>
+                            <option value="price_asc">Цена ↑</option>
+                            <option value="price_desc">Цена ↓</option>
+                            <option value="cat_asc">Категория A→Я</option>
+                        </select>
+                    </div>
+                    <details open class="mt-2">
+                        <summary class="cursor-pointer text-sm text-gray-300 hover:text-white mb-2">
+                            Категории (<span id="shop-catCount">все</span>)
+                        </summary>
+                        <div class="flex gap-2 mb-2">
+                            <button id="shop-catAll" type="button" class="px-3 py-1 rounded text-xs font-medium text-gray-200 bg-gray-700 hover:bg-gray-600 transition">все</button>
+                            <button id="shop-catNone" type="button" class="px-3 py-1 rounded text-xs font-medium text-gray-200 bg-gray-700 hover:bg-gray-600 transition">снять</button>
+                            <button id="shop-catInvert" type="button" class="px-3 py-1 rounded text-xs font-medium text-gray-200 bg-gray-700 hover:bg-gray-600 transition">инвертировать</button>
+                        </div>
+                        <div id="shop-catList" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-2 bg-gray-900 border border-gray-700 rounded"></div>
+                    </details>
+                </div>
+
                 <div class="bg-gray-800 shadow rounded-lg overflow-hidden border border-gray-700">
                     <div class="hidden md:flex bg-gray-700 p-4 text-xs font-medium text-gray-300 uppercase tracking-wider gap-4">
                         <div class="flex-1">Название</div>
@@ -298,32 +327,38 @@
                 if (!Array.isArray(cats)) cats = Object.values(cats);
                 window.NEI.categories = cats.filter((c) => c != null && c !== '');
                 if (window.NEI.loaded) neiRender();
-                const list = document.getElementById('shop-list');
-                list.innerHTML = '';
-                Object.keys(itemsRaw).forEach(key => {
-                    const item = itemsRaw[key];
-                    if(!item) return;
-                    list.innerHTML += `
-                        <div class="p-4 flex flex-col md:flex-row md:items-center gap-4 hover:bg-gray-750 transition">
-                            <div class="flex-1">
-                                <label class="text-xs text-gray-400 block md:hidden mb-1">Название товара</label>
-                                <input type="text" id="name-${key}" value="${item.name}" class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">
-                            </div>
-                            <div class="w-full md:w-32">
-                                <label class="text-xs text-gray-400 block md:hidden mb-1">Категория</label>
-                                <input type="text" id="cat-${key}" value="${item.category}" class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">
-                            </div>
-                            <div class="w-full md:w-24">
-                                <label class="text-xs text-gray-400 block md:hidden mb-1">Цена</label>
-                                <input type="number" id="price-${key}" value="${item.price}" class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">
-                            </div>
-                            <div class="flex gap-2 w-full md:w-[180px] pt-2 md:pt-0 border-t border-gray-700 md:border-t-0 mt-2 md:mt-0">
-                                <button onclick="saveItem('${key}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-3 rounded transition">Сохранить</button>
-                                <button onclick="deleteItem('${key}')" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-3 rounded transition">Удалить</button>
-                            </div>
-                        </div>
-                    `;
+
+                // === Tab "Товары" — заполняем state и вызываем shopRender ===
+                window.SHOP.raw = [];
+                Object.keys(itemsRaw).forEach((k) => {
+                    const it = itemsRaw[k];
+                    if (!it) return;
+                    window.SHOP.raw.push({ idx: Number(k), item: it });
                 });
+                // итоговый список категорий = из shop.categories ∪ уникальные из товаров
+                const catSet = new Set(window.NEI.categories.filter((c) => c !== 'ВСЕ'));
+                for (const p of window.SHOP.raw) {
+                    if (p.item.category) catSet.add(p.item.category);
+                }
+                const newAllCats = Array.from(catSet).sort((a,b) => a.localeCompare(b, 'ru'));
+                // первая инициализация — все категории + биндим контролы
+                if (!window.SHOP.initialized) {
+                    for (const c of newAllCats) window.SHOP.selectedCats.add(c);
+                    shopBindControls();
+                    window.SHOP.initialized = true;
+                } else {
+                    // новая категория появилась → добавляем в активные
+                    for (const c of newAllCats) {
+                        if (!window.SHOP.allCats.includes(c)) window.SHOP.selectedCats.add(c);
+                    }
+                    // категория исчезла → убираем
+                    for (const c of Array.from(window.SHOP.selectedCats)) {
+                        if (!newAllCats.includes(c)) window.SHOP.selectedCats.delete(c);
+                    }
+                }
+                window.SHOP.allCats = newAllCats;
+                shopRenderCatList();
+                shopRender();
             });
 
             // ЛОГИ
@@ -412,6 +447,160 @@
             'EnderIO','DraconicEvolution','hitechclassicmod','AdvancedSolarPanel','Avaritia',
             'GraviSuite','ae2additions','ae2stuff','PowerUtils','DragonsRadioMod','avaritiaddons'
         ];
+
+        // =====================================================================
+        // Shop tab — фильтры/сортировка/поиск по товарам из БД
+        // =====================================================================
+        window.SHOP = {
+            raw: [],                  // [{idx: number, item: {...}}]
+            allCats: [],              // массив существующих категорий (sorted)
+            selectedCats: new Set(),  // выбранные категории
+            sort: 'name_asc',
+            search: '',
+            initialized: false,
+        };
+
+        function shopBindControls() {
+            let to;
+            document.getElementById('shop-search').addEventListener('input', (e) => {
+                clearTimeout(to);
+                to = setTimeout(() => {
+                    window.SHOP.search = e.target.value.trim();
+                    shopRender();
+                }, 120);
+            });
+            document.getElementById('shop-sort').addEventListener('change', (e) => {
+                window.SHOP.sort = e.target.value;
+                shopRender();
+            });
+            document.getElementById('shop-catAll').addEventListener('click', () => {
+                window.SHOP.selectedCats = new Set(window.SHOP.allCats);
+                shopRenderCatList(); shopRender();
+            });
+            document.getElementById('shop-catNone').addEventListener('click', () => {
+                window.SHOP.selectedCats.clear();
+                shopRenderCatList(); shopRender();
+            });
+            document.getElementById('shop-catInvert').addEventListener('click', () => {
+                const inv = new Set();
+                for (const c of window.SHOP.allCats) {
+                    if (!window.SHOP.selectedCats.has(c)) inv.add(c);
+                }
+                window.SHOP.selectedCats = inv;
+                shopRenderCatList(); shopRender();
+            });
+        }
+
+        function shopRenderCatList() {
+            // подсчёт товаров по категории
+            const counts = {};
+            for (const p of window.SHOP.raw) {
+                const c = p.item.category || '—';
+                counts[c] = (counts[c] || 0) + 1;
+            }
+            const wrap = document.getElementById('shop-catList');
+            wrap.innerHTML = '';
+            for (const c of window.SHOP.allCats) {
+                const lab = document.createElement('label');
+                lab.className = 'mod-chip';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = window.SHOP.selectedCats.has(c);
+                cb.className = 'rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500';
+                cb.addEventListener('change', () => {
+                    if (cb.checked) window.SHOP.selectedCats.add(c);
+                    else window.SHOP.selectedCats.delete(c);
+                    document.getElementById('shop-catCount').textContent = shopCatCountLabel();
+                    shopRender();
+                });
+                const name = document.createElement('span');
+                name.textContent = c;
+                const cnt = document.createElement('span');
+                cnt.className = 'mod-count text-gray-400 tabular';
+                cnt.textContent = counts[c] || 0;
+                lab.append(cb, name, cnt);
+                wrap.appendChild(lab);
+            }
+            document.getElementById('shop-catCount').textContent = shopCatCountLabel();
+        }
+
+        function shopCatCountLabel() {
+            const total = window.SHOP.allCats.length;
+            const sel = window.SHOP.selectedCats.size;
+            return (sel === total) ? 'все' : (sel + ' из ' + total);
+        }
+
+        function shopRender() {
+            let arr = window.SHOP.raw.slice();
+
+            // фильтр по категориям (если выбраны не все — фильтруем)
+            const sel = window.SHOP.selectedCats;
+            if (sel.size !== window.SHOP.allCats.length) {
+                arr = arr.filter((p) => sel.has(p.item.category || '—'));
+            }
+
+            // поиск
+            const q = (window.SHOP.search || '').toLowerCase();
+            if (q) {
+                arr = arr.filter((p) => {
+                    const it = p.item;
+                    const n = (it.name || '').toLowerCase();
+                    const id = (it.id || '').toLowerCase();
+                    const cat = (it.category || '').toLowerCase();
+                    return n.includes(q) || id.includes(q) || cat.includes(q);
+                });
+            }
+
+            // сортировка
+            switch (window.SHOP.sort) {
+                case 'name_asc':   arr.sort((a,b) => (a.item.name||'').localeCompare(b.item.name||'','ru')); break;
+                case 'name_desc':  arr.sort((a,b) => (b.item.name||'').localeCompare(a.item.name||'','ru')); break;
+                case 'price_asc':  arr.sort((a,b) => (Number(a.item.price)||0) - (Number(b.item.price)||0)); break;
+                case 'price_desc': arr.sort((a,b) => (Number(b.item.price)||0) - (Number(a.item.price)||0)); break;
+                case 'cat_asc':    arr.sort((a,b) => {
+                                       const c = (a.item.category||'').localeCompare(b.item.category||'','ru');
+                                       return c !== 0 ? c : (a.item.name||'').localeCompare(b.item.name||'','ru');
+                                   }); break;
+            }
+
+            document.getElementById('shop-stats').textContent =
+                arr.length + ' / ' + window.SHOP.raw.length + ' товаров';
+
+            const list = document.getElementById('shop-list');
+            if (!arr.length) {
+                list.innerHTML = '<div class="p-6 text-center text-gray-500 text-sm">Ничего не найдено</div>';
+                return;
+            }
+            const parts = [];
+            for (const p of arr) {
+                const item = p.item;
+                const key = p.idx;  // оригинальный индекс в shop.items — нужен для save/delete
+                const nameVal = (item.name || '').replace(/"/g, '&quot;');
+                const catVal  = (item.category || '').replace(/"/g, '&quot;');
+                const priceVal = item.price ?? 0;
+                parts.push(
+                    '<div class="p-4 flex flex-col md:flex-row md:items-center gap-4 hover:bg-gray-750 transition">'
+                  + '  <div class="flex-1">'
+                  + '    <label class="text-xs text-gray-400 block md:hidden mb-1">Название товара</label>'
+                  + '    <input type="text" id="name-' + key + '" value="' + nameVal + '" class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">'
+                  + '  </div>'
+                  + '  <div class="w-full md:w-32">'
+                  + '    <label class="text-xs text-gray-400 block md:hidden mb-1">Категория</label>'
+                  + '    <input type="text" id="cat-' + key + '" value="' + catVal + '" class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">'
+                  + '  </div>'
+                  + '  <div class="w-full md:w-24">'
+                  + '    <label class="text-xs text-gray-400 block md:hidden mb-1">Цена</label>'
+                  + '    <input type="number" id="price-' + key + '" value="' + priceVal + '" class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">'
+                  + '  </div>'
+                  + '  <div class="flex gap-2 w-full md:w-[180px] pt-2 md:pt-0 border-t border-gray-700 md:border-t-0 mt-2 md:mt-0">'
+                  + '    <button onclick="saveItem(\'' + key + '\')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-3 rounded transition">Сохранить</button>'
+                  + '    <button onclick="deleteItem(\'' + key + '\')" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-3 rounded transition">Удалить</button>'
+                  + '  </div>'
+                  + '</div>'
+                );
+            }
+            list.innerHTML = parts.join('');
+        }
 
         window.NEI = {
             all: [],
