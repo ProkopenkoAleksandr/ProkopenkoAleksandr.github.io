@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>МЭ Магазин | Админ-Панель</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-200 font-sans antialiased min-h-screen flex flex-col">
+
+    <div id="login-screen" class="flex flex-1 items-center justify-center p-4">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md border border-gray-700">
+            <h2 class="text-3xl font-bold text-center text-blue-400 mb-6">Вход в систему</h2>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400">Никнейм</label>
+                    <input type="text" id="email" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-3 px-4 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400">Пароль</label>
+                    <input type="password" id="password" required class="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-3 px-4 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div id="login-error" class="text-red-500 text-sm hidden text-center">Неверный логин или пароль.</div>
+                <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition">
+                    Войти
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="dashboard" class="hidden flex-1 flex flex-col">
+        <nav class="bg-gray-800 border-b border-gray-700 sticky top-0 z-10">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center">
+                        <span class="text-xl font-bold text-blue-400 mr-4">МЭ Магазин</span>
+                        <div class="hidden sm:flex space-x-2">
+                            <button onclick="switchTab('users')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium bg-gray-900 text-white" id="tab-users">Игроки</button>
+                            <button onclick="switchTab('shop')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-shop">Товары</button>
+                            <button onclick="switchTab('logs')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-logs">Логи</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span id="user-email" class="text-sm text-gray-400 hidden md:block"></span>
+                        <button onclick="logout()" class="px-4 py-2 rounded-md text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition">Выход</button>
+                    </div>
+                </div>
+                <div class="sm:hidden pb-3 pt-1 flex space-x-2 overflow-x-auto no-scrollbar">
+                    <button onclick="switchTab('users')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium bg-gray-900 text-white" id="tab-users-mob">Игроки</button>
+                    <button onclick="switchTab('shop')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-shop-mob">Товары</button>
+                    <button onclick="switchTab('logs')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-logs-mob">Логи</button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            
+            <div id="content-users" class="tab-content block">
+                <h2 class="text-2xl font-bold mb-4">Управление балансом</h2>
+                <div class="bg-gray-800 shadow rounded-lg overflow-hidden border border-gray-700">
+                    <div class="hidden sm:flex bg-gray-700 p-4 text-xs font-medium text-gray-300 uppercase tracking-wider">
+                        <div class="flex-1">Никнейм</div>
+                        <div class="w-48 text-center">Баланс</div>
+                    </div>
+                    <div id="users-list" class="divide-y divide-gray-700"></div>
+                </div>
+            </div>
+
+            <div id="content-shop" class="tab-content hidden">
+                <h2 class="text-2xl font-bold mb-4">Товары на витрине</h2>
+                <div class="bg-gray-800 shadow rounded-lg overflow-hidden border border-gray-700">
+                    <div class="hidden md:flex bg-gray-700 p-4 text-xs font-medium text-gray-300 uppercase tracking-wider gap-4">
+                        <div class="flex-1">Название</div>
+                        <div class="w-32">Категория</div>
+                        <div class="w-24">Цена</div>
+                        <div class="w-[180px] text-center">Действия</div>
+                    </div>
+                    <div id="shop-list" class="divide-y divide-gray-700"></div>
+                </div>
+            </div>
+
+            <div id="content-logs" class="tab-content hidden">
+                <h2 class="text-2xl font-bold mb-4">История операций</h2>
+                <div class="bg-gray-800 shadow rounded-lg overflow-hidden border border-gray-700">
+                    <div id="logs-list" class="divide-y divide-gray-700"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="./firebase-config.js"></script>
+    
+    <script>
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.database();
+
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('dashboard').classList.remove('hidden');
+                document.getElementById('user-email').innerText = user.email.replace('@shop.local', '');
+                loadData(); 
+            } else {
+                document.getElementById('login-screen').classList.remove('hidden');
+                document.getElementById('dashboard').classList.add('hidden');
+            }
+        });
+
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            let email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            
+            if (!email.includes('@')) {
+                email = email + '@shop.local';
+            }
+            
+            auth.signInWithEmailAndPassword(email, password).catch(() => {
+                document.getElementById('login-error').classList.remove('hidden');
+            });
+        });
+
+        function logout() { auth.signOut(); }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('bg-gray-900', 'text-white');
+                el.classList.add('text-gray-300');
+            });
+            
+            document.getElementById('content-' + tabId).classList.remove('hidden');
+            document.getElementById('tab-' + tabId).classList.add('bg-gray-900', 'text-white');
+            if(document.getElementById('tab-' + tabId + '-mob')) {
+                document.getElementById('tab-' + tabId + '-mob').classList.add('bg-gray-900', 'text-white');
+            }
+        }
+
+        function loadData() {
+            // ПОЛЬЗОВАТЕЛИ
+            db.ref('users').on('value', (snapshot) => {
+                const users = snapshot.val() || {};
+                const list = document.getElementById('users-list');
+                list.innerHTML = '';
+                for (const [name, rawData] of Object.entries(users)) {
+                    let data = rawData;
+                    if (typeof rawData === 'string') { try { data = JSON.parse(rawData); } catch(e) { data = { balance: 0 }; } }
+                    const balance = data.balance !== undefined ? data.balance : 0;
+                    list.innerHTML += `
+                        <div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-750 transition">
+                            <div class="font-bold text-lg sm:text-base text-white">${name}</div>
+                            <div class="flex items-center gap-3">
+                                <div class="flex-1 sm:flex-none">
+                                    <label class="text-xs text-gray-400 block sm:hidden mb-1">Баланс</label>
+                                    <input type="number" id="bal-${name}" value="${balance}" class="w-full sm:w-28 bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">
+                                </div>
+                                <div class="pt-5 sm:pt-0">
+                                    <button onclick="saveBalance('${name}')" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded transition w-full sm:w-auto">Сохранить</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            // ТОВАРЫ
+            db.ref('shop').on('value', (snapshot) => {
+                let shopData = snapshot.val() || {};
+                if (typeof shopData === 'string') { try { shopData = JSON.parse(shopData); } catch(e) { shopData = {}; } }
+                const itemsRaw = shopData.items || [];
+                const list = document.getElementById('shop-list');
+                list.innerHTML = '';
+                Object.keys(itemsRaw).forEach(key => {
+                    const item = itemsRaw[key];
+                    if(!item) return;
+                    list.innerHTML += `
+                        <div class="p-4 flex flex-col md:flex-row md:items-center gap-4 hover:bg-gray-750 transition">
+                            <div class="flex-1">
+                                <label class="text-xs text-gray-400 block md:hidden mb-1">Название товара</label>
+                                <input type="text" id="name-${key}" value="${item.name}" class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div class="w-full md:w-32">
+                                <label class="text-xs text-gray-400 block md:hidden mb-1">Категория</label>
+                                <input type="text" id="cat-${key}" value="${item.category}" class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div class="w-full md:w-24">
+                                <label class="text-xs text-gray-400 block md:hidden mb-1">Цена</label>
+                                <input type="number" id="price-${key}" value="${item.price}" class="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500">
+                            </div>
+                            <div class="flex gap-2 w-full md:w-[180px] pt-2 md:pt-0 border-t border-gray-700 md:border-t-0 mt-2 md:mt-0">
+                                <button onclick="saveItem('${key}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-3 rounded transition">Сохранить</button>
+                                <button onclick="deleteItem('${key}')" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-3 rounded transition">Удалить</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            });
+
+            // ЛОГИ
+            db.ref('logs').orderByKey().limitToLast(100).on('value', (snapshot) => {
+                const logsRaw = snapshot.val() || {};
+                const list = document.getElementById('logs-list');
+                list.innerHTML = '';
+                const logsArray = [];
+                for (const key in logsRaw) {
+                    let log = logsRaw[key];
+                    if (typeof log === 'string') { try { log = JSON.parse(log); } catch(e) { continue; } }
+                    logsArray.push(log);
+                }
+                logsArray.reverse(); 
+                logsArray.forEach(log => {
+                    let actionColor = "text-gray-300";
+                    if(log.action.includes("ПОКУПКА")) actionColor = "text-green-400";
+                    if(log.action.includes("ПРОДАЖА") || log.action.includes("СКУПКА")) actionColor = "text-yellow-400";
+                    if(log.action.includes("УДАЛЕН") || log.action.includes("ОШИБКА")) actionColor = "text-red-400";
+
+                    list.innerHTML += `
+                        <div class="p-4 hover:bg-gray-750 transition flex flex-col gap-1">
+                            <div class="flex flex-wrap justify-between items-center gap-x-4 gap-y-1 border-b border-gray-700 pb-2 sm:border-0 sm:pb-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-base text-white">${log.user}</span>
+                                    <span class="text-sm font-bold bg-gray-900 px-2 py-0.5 rounded ${actionColor}">${log.action}</span>
+                                </div>
+                                <span class="text-xs font-mono text-gray-400">${log.time}</span>
+                            </div>
+                            <div class="text-sm text-gray-300 break-words mt-1">${log.details}</div>
+                        </div>
+                    `;
+                });
+            });
+        }
+
+        window.saveBalance = function(name) {
+            const newBal = document.getElementById(`bal-${name}`).value;
+            db.ref(`users/${name}/balance`).set(Number(newBal))
+              .then(() => showToast('Баланс успешно обновлен', 'success'))
+              .catch(e => showToast('Ошибка сохранения', 'error'));
+        }
+
+        window.saveItem = function(key) {
+            const name = document.getElementById(`name-${key}`).value;
+            const cat = document.getElementById(`cat-${key}`).value;
+            const price = document.getElementById(`price-${key}`).value;
+            
+            db.ref('shop').once('value').then((snapshot) => {
+                let shopData = snapshot.val() || {};
+                if (typeof shopData === 'string') { try { shopData = JSON.parse(shopData); } catch(e) { shopData = { items: [] }; } }
+                if (shopData.items && shopData.items[key]) {
+                    shopData.items[key].name = name;
+                    shopData.items[key].category = cat;
+                    shopData.items[key].price = Number(price);
+                    db.ref('shop').set(shopData)
+                      .then(() => showToast('Товар успешно обновлен', 'success'))
+                      .catch(e => showToast('Ошибка сохранения', 'error'));
+                }
+            });
+        }
+
+        window.deleteItem = function(key) {
+            if (!confirm('Удалить товар навсегда?')) return;
+            db.ref('shop').once('value').then((snapshot) => {
+                let shopData = snapshot.val() || {};
+                if (typeof shopData === 'string') { try { shopData = JSON.parse(shopData); } catch(e) { shopData = { items: [] }; } }
+                if (shopData.items) {
+                    let itemsArray = Array.isArray(shopData.items) ? shopData.items : Object.values(shopData.items);
+                    itemsArray.splice(Number(key), 1);
+                    shopData.items = itemsArray.filter(Boolean);
+                    db.ref('shop').set(shopData)
+                      .then(() => showToast('Товар удален', 'success'))
+                      .catch(e => showToast('Ошибка удаления', 'error'));
+                }
+            });
+        }
+
+        function showToast(message, type) {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-4 right-4 sm:bottom-8 sm:right-8 px-6 py-4 rounded-lg shadow-2xl text-white font-medium transition-all duration-300 transform translate-y-10 opacity-0 ${type === 'success' ? 'bg-green-600' : 'bg-red-600'} z-50`;
+            toast.innerText = message;
+            document.body.appendChild(toast);
+            requestAnimationFrame(() => { toast.classList.remove('translate-y-10', 'opacity-0'); });
+            setTimeout(() => { toast.classList.add('translate-y-10', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+    </script>
+</body>
+</html>
