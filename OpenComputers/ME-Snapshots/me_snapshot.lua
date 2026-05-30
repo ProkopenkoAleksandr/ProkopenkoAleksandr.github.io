@@ -19,6 +19,11 @@ local INTERVAL = tonumber(config.snapshot_interval) or 60
 local MIN_SIZE = tonumber(config.min_size) or 1
 local MAX_ITEMS = tonumber(config.max_items) or 5000
 
+-- Heartbeat-стейт для дашборда (сама функция объявлена ниже, после getRealTime)
+local startedAt = nil
+local lastUnique, lastTotal, lastBytes = 0, 0, 0
+local sendHeartbeat  -- forward declaration
+
 -- =========================================================
 -- ВРЕМЯ (как у крафтера — точное по lastModified файла)
 -- =========================================================
@@ -50,6 +55,27 @@ local function getRealTime()
         if lm and lm > 0 then return formatUnixTime(math.floor(lm / 1000) + tz * 3600) end
     end
     return os.date("%Y-%m-%d %H:%M:%S") .. " (игр)"
+end
+
+-- Heartbeat для дашборда. Шлёт компактный snapshot статуса в /heartbeats/me_snapshot
+sendHeartbeat = function(stopped)
+    if not config.use_database then return end
+    if not config.firebase_url or config.firebase_url == "" or config.firebase_url == "заменить" then return end
+    if not component.isAvailable("internet") then return end
+    if not startedAt then startedAt = getRealTime() end
+    pcall(function()
+        network.put("/heartbeats/me_snapshot", json.encode({
+            name = "ME-Snapshot",
+            type = "me_snapshot",
+            last_seen = getRealTime(),
+            started_at = startedAt,
+            interval = INTERVAL,
+            last_unique = lastUnique,
+            last_total = lastTotal,
+            last_bytes = lastBytes,
+            stopped = stopped or false,
+        }))
+    end)
 end
 
 -- Логирование ТОЛЬКО в Firebase /logs.
@@ -169,19 +195,24 @@ while true do
                 iter, snap.updated_at, snap.unique_count, snap.total_size,
                 math.floor((bytes or 0) / 1024),
                 snap.truncated and (" (trunc " .. snap.truncated .. ")") or ""))
-            logToFile(string.format("OK %d позиций / %d шт / %d KB",
-                snap.unique_count, snap.total_size, math.floor((bytes or 0) / 1024)))
+            lastUnique = snap.unique_count
+            lastTotal = snap.total_size
+            lastBytes = bytes or 0
         else
-            print("[" .. iter .. "] публикация провалилась — смотри /home/me_snapshot.log")
+            print("[" .. iter .. "] публикация провалилась")
         end
         snap = nil; raw = nil  -- освобождаем большие таблицы для GC
     end
+
+    -- heartbeat для дашборда после каждого тика
+    sendHeartbeat()
 
     -- ждём INTERVAL секунд, реагируем на Ctrl+Alt+C
     local target = computer.uptime() + INTERVAL
     while computer.uptime() < target do
         local ev = event.pull(1, "interrupted")
         if ev then
+            sendHeartbeat(true)  -- финальный heartbeat «stopped»
             logToFile("СТОП")
             os.exit()
         end

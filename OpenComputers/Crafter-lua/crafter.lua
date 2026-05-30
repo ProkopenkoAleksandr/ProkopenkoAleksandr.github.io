@@ -58,6 +58,11 @@ local STATUS_PUBLISH_INTERVAL = 15  -- было 5: реже = меньше JSON-
 local lastStatusAt = 0
 local statusPublishedOnce = false
 
+-- Heartbeat для дашборда: маленький snapshot со временем последней активности
+local HEARTBEAT_INTERVAL = 30
+local lastHeartbeatAt = 0
+local startedAt = nil  -- инициализируем при первом heartbeat'е
+
 -- =========================================================
 -- УТИЛИТЫ
 -- =========================================================
@@ -285,6 +290,31 @@ end
 -- =========================================================
 -- ПУБЛИКАЦИЯ СТАТУСА В FIREBASE /crafter_status
 -- =========================================================
+-- Heartbeat для дашборда. Шлёт компактный snapshot в /heartbeats/crafter.
+local function sendHeartbeat(force)
+    if not config.use_database then return end
+    if not config.firebase_url or config.firebase_url == "" or config.firebase_url == "заменить" then return end
+    if not component.isAvailable("internet") then return end
+    local now = computer.uptime()
+    if not force and (now - lastHeartbeatAt) < HEARTBEAT_INTERVAL then return end
+    lastHeartbeatAt = now
+    if not startedAt then startedAt = getRealTime() end
+    local payload = {
+        name = "Автокрафтер",
+        type = "crafter",
+        last_seen = getRealTime(),
+        started_at = startedAt,
+        paused = paused,
+        active_count = countActive(),
+        max_concurrent = maxConcurrent,
+        me_ok = meOk,
+        db_ok = dbOk,
+        total_completed = totalCompleted,
+        total_failed = totalFailed,
+    }
+    pcall(function() network.put("/heartbeats/crafter", json.encode(payload)) end)
+end
+
 local function publishStatus(force)
     if not config.use_database then return end
     if not config.firebase_url or config.firebase_url == "" or config.firebase_url == "заменить" then return end
@@ -582,6 +612,14 @@ local function handleClick(id)
             }
             network.put("/crafter_status", json.encode(final))
         end)
+        -- heartbeat «вышел вручную»
+        pcall(function()
+            network.put("/heartbeats/crafter", json.encode({
+                name = "Автокрафтер", type = "crafter",
+                last_seen = getRealTime(), started_at = startedAt,
+                stopped = true,
+            }))
+        end)
         gpu = component.gpu
         gpu.setBackground(0x000000); gpu.setForeground(0xFFFFFF)
         require("term").clear()
@@ -630,6 +668,7 @@ local function loop()
         if stocks then tryFillSlots(stocks) end
         stocks = nil  -- освобождаем ссылку чтобы GC мог собрать большую таблицу
         publishStatus()  -- rate-limited
+        sendHeartbeat()  -- raz в 30 сек heartbeat для дашборда
 
         -- Периодическая диагностика памяти. OC выполняет GC сам, ручной вызов не нужен
         -- (collectgarbage в sandbox 1.7.10 недоступен и упадёт).
