@@ -32,9 +32,16 @@ local activeJobs = {}  -- [key] = {job, name, amount, started_at, key, id, damag
 local recentLog = {}   -- лог в памяти (новые сверху)
 local MAX_LOG_LINES = 25       -- было 60 — на OC экономим RAM
 local JOB_TTL_SEC = 3600       -- max возраст job в activeJobs — иначе принудительно убираем (1 час)
-local MAX_LOG_LINE_LEN = 180   -- обрезаем длинные details, чтобы не накапливать гигантские строки
+local MAX_LOG_LINE_LEN = 180   -- обрезаем длинные details
 local TICKS_PER_GC = 10        -- запускать GC каждые N итераций event-loop'а
 local tickCounter = 0
+
+-- Ротация лог-файла
+local LOG_FILE = "/home/crafter.log"
+local LOG_MAX_BYTES = 50000          -- максимум 50 КБ
+local LOG_KEEP_BYTES = 10000         -- оставляем последние 10 КБ
+local LOG_CHECK_EVERY = 50           -- проверять размер раз в N вызовов log()
+local logWriteCounter = 0
 
 local lastTickAt = -INTERVAL  -- чтобы первый тик случился сразу
 local secondsToTick = 0
@@ -107,24 +114,28 @@ local function log(action, details)
     pushLog(short)
     -- В файл — с полной датой
     local fileLine = string.format("[%s] %s | crafter | %s", t, action, details or "")
-    local f = io.open("/home/crafter.log", "a")
+    local f = io.open(LOG_FILE, "a")
     if f then f:write(fileLine .. "\n"); f:close() end
-    -- ротация лога: триггеримся реже и читаем только хвост, чтобы не аллоцировать огромный list
-    local sz = fs.size("/home/crafter.log")
-    if sz and sz > 50000 then
-        -- сохраняем последние ~10 KB
-        local fr = io.open("/home/crafter.log", "r")
-        if fr then
-            fr:seek("end", -10000)
-            local tail = fr:read("*a") or ""
-            fr:close()
-            local fw = io.open("/home/crafter.log", "w")
-            if fw then
-                -- первая строка может быть обрезанной — отбрасываем до первого \n
-                local nl = tail:find("\n", 1, true)
-                if nl then tail = tail:sub(nl + 1) end
-                fw:write(tail)
-                fw:close()
+
+    -- Ротация лога — проверяем размер не на каждый вызов, а раз в LOG_CHECK_EVERY
+    logWriteCounter = logWriteCounter + 1
+    if logWriteCounter >= LOG_CHECK_EVERY then
+        logWriteCounter = 0
+        local sz = fs.size(LOG_FILE)
+        if sz and sz > LOG_MAX_BYTES then
+            local fr = io.open(LOG_FILE, "r")
+            if fr then
+                fr:seek("end", -LOG_KEEP_BYTES)
+                local tail = fr:read("*a") or ""
+                fr:close()
+                local fw = io.open(LOG_FILE, "w")
+                if fw then
+                    -- первая строка может быть обрезанной — отбрасываем до первого \n
+                    local nl = tail:find("\n", 1, true)
+                    if nl then tail = tail:sub(nl + 1) end
+                    fw:write(tail)
+                    fw:close()
+                end
             end
         end
     end
@@ -637,6 +648,27 @@ end
 -- =========================================================
 -- ОСНОВНОЙ ЦИКЛ
 -- =========================================================
+-- При старте один раз проверим размер лога — если уже жирный, сразу обрежем
+do
+    local sz = fs.size(LOG_FILE)
+    if sz and sz > LOG_MAX_BYTES then
+        local fr = io.open(LOG_FILE, "r")
+        if fr then
+            fr:seek("end", -LOG_KEEP_BYTES)
+            local tail = fr:read("*a") or ""
+            fr:close()
+            local fw = io.open(LOG_FILE, "w")
+            if fw then
+                local nl = tail:find("\n", 1, true)
+                if nl then tail = tail:sub(nl + 1) end
+                fw:write(tail)
+                fw:close()
+                io.stdout:write("[crafter] лог обрезан с " .. sz .. " до ~" .. LOG_KEEP_BYTES .. " байт\n")
+            end
+        end
+    end
+end
+
 log("СТАРТ", string.format("interval=%ds, default_amount=%d, max_concurrent=%d",
     INTERVAL, DEFAULT_AMOUNT, maxConcurrent))
 
