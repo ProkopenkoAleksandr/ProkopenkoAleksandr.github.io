@@ -693,11 +693,11 @@ local function loop()
         stocks = nil  -- освобождаем ссылку чтобы GC мог собрать большую таблицу
         publishStatus()  -- rate-limited
 
-        -- Периодическая диагностика памяти (OC сам делает GC, collectgarbage в sandbox недоступен)
+        -- Периодическая диагностика памяти. OC выполняет GC сам, ручной вызов не нужен
+        -- (collectgarbage в sandbox 1.7.10 недоступен и упадёт).
         tickCounter = tickCounter + 1
         if tickCounter >= TICKS_PER_GC then
             tickCounter = 0
-            pcall(function() if collectgarbage then collectgarbage("collect") end end)
             local total = computer.totalMemory()
             local free = computer.freeMemory()
             if total and total > 0 then
