@@ -340,7 +340,10 @@ local function shopTick()
         end
         if currentUser and state ~= "modal_msg" and state ~= "admin_wait_scan" and state ~= "editor" and not string.match(state, "admin") then
             idleTimer = idleTimer - 1
-            if idleTimer <= 0 then 
+            if idleTimer <= 0 then
+                local name = currentUser.name
+                local bal = currentUser.balance
+                writeLog("ЛОГАУТ (АВТО)", name, "Бездействие. Баланс: " .. bal .. " " .. CUR)
                 currentUser = nil; cart = {}; state = "shop"; active_category = "ВСЕ"; currentPage = 1
                 shouldRefreshFull = true
             else
@@ -430,7 +433,7 @@ local function shopTick()
             refreshScreen()
 
         elseif ev == "scroll" then
-            local dir = arg4
+            local dir = tonumber(arg4) or 0   -- иногда приходит строкой, защищаемся
             local player_name = arg5
             if currentUser and currentUser.name ~= player_name then computer.beep(400, 0.1)
             else
@@ -573,9 +576,18 @@ local function shopTick()
                                     end
                                 end
                             end
-                            currentUser = { name = player_name, balance = bal, isAdmin = is_adm }; idleTimer = 30; refreshScreen()
-                        
-                        elseif action == "logout" then currentUser = nil; cart = {}; currentPage = 1; refreshScreen()
+                            currentUser = { name = player_name, balance = bal, isAdmin = is_adm }; idleTimer = 30
+                            writeLog("ЛОГИН", player_name,
+                                "Вход в магазин. Баланс: " .. bal .. " " .. CUR
+                                .. (is_adm and " (АДМИН)" or ""))
+                            refreshScreen()
+
+                        elseif action == "logout" then
+                            if currentUser then
+                                writeLog("ЛОГАУТ", currentUser.name,
+                                    "Выход по кнопке. Баланс: " .. currentUser.balance .. " " .. CUR)
+                            end
+                            currentUser = nil; cart = {}; currentPage = 1; refreshScreen()
                         elseif action == "admin_panel" then state = "admin_item"; adminPage = 1; refreshScreen()
                         elseif action == "search" then
                             -- клик по инпуту: ставим/снимаем фокус, дальше ввод идёт прямо в строку
@@ -587,12 +599,18 @@ local function shopTick()
                         elseif action == "sell_all" then
                             if not currentUser then showMsg("ОШИБКА", "Авторизуйтесь!", true)
                             else
+                                local balBefore = currentUser.balance
                                 local success, msg, earned = me.sellAll(shop_buyback)
-                                if success then 
+                                if success then
                                     currentUser.balance = currentUser.balance + earned; saveUser()
-                                    writeLog("ПРОДАЖА", currentUser.name, msg .. " Начислено: " .. earned .. " " .. CUR)
+                                    writeLog("ПРОДАЖА", currentUser.name,
+                                        msg .. " | Начислено: " .. earned .. " " .. CUR
+                                        .. " | Баланс: " .. balBefore .. " → " .. currentUser.balance .. " " .. CUR)
                                     showMsg("УСПЕШНАЯ СДАЧА", msg .. " Зачислено: " .. earned .. " " .. CUR, false, 3)
-                                else showMsg("ОШИБКА", msg, true) end
+                                else
+                                    writeLog("ОШИБКА ПРОДАЖИ", currentUser.name, msg or "?")
+                                    showMsg("ОШИБКА", msg, true)
+                                end
                             end
                             
                         elseif action:match("buy_") or action:match("cart_") then
@@ -622,17 +640,34 @@ local function shopTick()
                             end
                         elseif action == "confirm_buy" then
                             local cost = selectedItem.price * selectedQty
-                            if selectedItem.stock < selectedQty then showMsg("ОШИБКА", "Не хватает товара в МЭ!", true)
-                            elseif currentUser.balance < cost then showMsg("ОШИБКА", "Мало " .. CUR .. "!", true)
+                            if selectedItem.stock < selectedQty then
+                                writeLog("ОШИБКА ПОКУПКИ", currentUser.name,
+                                    "Не хватает товара в МЭ: " .. selectedItem.name .. " (нужно " .. selectedQty .. ", есть " .. (selectedItem.stock or 0) .. ")")
+                                showMsg("ОШИБКА", "Не хватает товара в МЭ!", true)
+                            elseif currentUser.balance < cost then
+                                writeLog("ОШИБКА ПОКУПКИ", currentUser.name,
+                                    "Недостаточно " .. CUR .. ": " .. selectedItem.name .. " x" .. selectedQty
+                                    .. " (нужно " .. cost .. ", есть " .. currentUser.balance .. ")")
+                                showMsg("ОШИБКА", "Мало " .. CUR .. "!", true)
                             else
+                                local balBefore = currentUser.balance
                                 local ok, msg, actual_moved = me.buyItem(selectedItem, selectedQty)
                                 if ok and actual_moved and actual_moved > 0 then
                                     local actual_cost = selectedItem.price * actual_moved
                                     currentUser.balance = currentUser.balance - actual_cost; saveUser(); saveShop()
-                                    writeLog("ПОКУПКА", currentUser.name, "Куплено: " .. selectedItem.name .. " x" .. actual_moved .. " за " .. actual_cost .. " " .. CUR)
+                                    writeLog("ПОКУПКА", currentUser.name,
+                                        selectedItem.name .. " x" .. actual_moved
+                                        .. " по " .. selectedItem.price .. " " .. CUR
+                                        .. " = " .. actual_cost .. " " .. CUR
+                                        .. " | Баланс: " .. balBefore .. " → " .. currentUser.balance .. " " .. CUR
+                                        .. (actual_moved < selectedQty and " | ЧАСТИЧНО (запрошено " .. selectedQty .. ")" or ""))
                                     if actual_moved < selectedQty then showMsg("ВНИМАНИЕ", "Сундук полон! Выдано " .. actual_moved .. " шт. Списано: " .. actual_cost .. " " .. CUR, true, 6)
                                     else showMsg("УСПЕХ", "Выдано " .. actual_moved .. " шт. за " .. actual_cost .. " " .. CUR, false, 3) end
-                                else showMsg("ОШИБКА ВЫДАЧИ", msg, true) end
+                                else
+                                    writeLog("ОШИБКА ВЫДАЧИ", currentUser.name,
+                                        selectedItem.name .. " x" .. selectedQty .. ": " .. tostring(msg))
+                                    showMsg("ОШИБКА ВЫДАЧИ", msg, true)
+                                end
                             end
                         end
                         if selectedQty < 1 then selectedQty = 1 end
@@ -658,9 +693,13 @@ local function shopTick()
                                             if actual_moved < ci.qty then all_ok = false end
                                         else all_ok = false end
                                     end
+                                    local balBefore = currentUser.balance
                                     currentUser.balance = currentUser.balance - actual_total; cart = {}; saveUser(); saveShop()
                                     if receipt_str == "" then receipt_str = "ОШИБКА ВЫДАЧИ " end
-                                    writeLog("ПОКУПКА (КОРЗИНА)", currentUser.name, receipt_str .. "на сумму " .. actual_total .. " " .. CUR)
+                                    writeLog("ПОКУПКА (КОРЗИНА)", currentUser.name,
+                                        receipt_str .. "| Сумма: " .. actual_total .. " " .. CUR
+                                        .. " | Баланс: " .. balBefore .. " → " .. currentUser.balance .. " " .. CUR
+                                        .. (all_ok and "" or " | ЧАСТИЧНО"))
                                     
                                     if all_ok then showMsg("ОПЛАТА", "Покупки успешно выданы!", false, 3)
                                     else showMsg("ВНИМАНИЕ", "Места не хватило. Выдано частично! Списано: " .. actual_total .. " " .. CUR, true, 6) end
@@ -703,14 +742,26 @@ while true do
     if not ok then
         -- ПРОПУСКАЕМ АДМИНА В КОНСОЛЬ:
         if tostring(err):match("ADMIN_EXIT") then break end
-        
-        local f = io.open("/home/shop_crash.log", "a")
-        if f then 
-            f:write(os.date("%Y-%m-%d %H:%M:%S") .. " | FATAL CRASH: " .. tostring(err) .. "\n")
-            f:close() 
+
+        -- Шлём краш в Firebase /logs (синхронно, без pcall-обёртки writeLog,
+        -- чтобы реально дождаться сетевого запроса до shutdown)
+        local errStr = tostring(err)
+        if errStr and #errStr > 400 then errStr = errStr:sub(1, 400) .. "…" end
+        if config.use_database and component.isAvailable("internet")
+           and config.firebase_url and config.firebase_url ~= "" and config.firebase_url ~= "заменить" then
+            pcall(function()
+                network.request("POST", "/logs", json.encode({
+                    time = getRealTime(),
+                    action = "КРАШ МАГАЗИНА",
+                    user = "shop",
+                    details = errStr,
+                }))
+            end)
+            -- финальный heartbeat «stopped», чтобы дашборд сразу показал OFF
+            pcall(function() if sendHeartbeat then sendHeartbeat(true) end end)
         end
-        
+
         os.sleep(3)
-        computer.shutdown(true) 
+        computer.shutdown(true)
     end
 end
