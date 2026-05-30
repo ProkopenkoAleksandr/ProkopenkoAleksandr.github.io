@@ -831,6 +831,11 @@
             // сортировка по времени (ISO/DD.MM.YYYY HH:MM:SS — оба формата)
             filtered.sort((a, b) => parseLogTime(b.time) - parseLogTime(a.time));
 
+            // если статус крафтера ещё не пришёл — пересчитаем его по логам
+            if (!window.CRAFTER_STATUS && document.getElementById('crafter-status-body')) {
+                try { renderCrafterStatus(); } catch(e) {}
+            }
+
             // ограничение
             const view = filtered.slice(0, 300);
 
@@ -1079,17 +1084,101 @@
             list.innerHTML = parts.join('');
         }
 
-        // === Статус автокрафтера (читается из /crafter_status) ===
+        // Восстановление активных крафтов из /logs (fallback, когда /crafter_status пустой).
+        // Идём по логам от свежих к старым; для каждого ЗАКАЗАН — добавляем в map,
+        // встретили завершение/отмену — удаляем. То что осталось — реально живые крафты.
+        function inferActiveJobsFromLogs() {
+            const logs = (window.LOGS_STATE && window.LOGS_STATE.shared) ? window.LOGS_STATE.shared : [];
+            if (!logs.length) return [];
+            // упорядочим хронологически (от старых к новым)
+            const sorted = logs.slice().sort((a, b) => parseLogTime(a.time) - parseLogTime(b.time));
+            const active = new Map();  // name → {name, amount, time, ageSec}
+            const reOrder = /^(.+?) x(\d+)/;
+            const reDone  = /^(.+?) x(\d+)/;
+            for (const log of sorted) {
+                if (!log || log.user !== 'crafter') continue;
+                const action = String(log.action || '').toUpperCase();
+                const details = String(log.details || '');
+                if (action === 'ЗАКАЗАН') {
+                    const m = details.match(reOrder);
+                    if (m) {
+                        const name = m[1].trim();
+                        const amount = Number(m[2]) || 0;
+                        active.set(name, { name: name, amount: amount, time: log.time, startedMs: parseLogTime(log.time) });
+                    }
+                } else if (action.startsWith('ЗАВЕРШЁН') || action === 'ОТМЕНЁН' || action === 'ПРОВАЛ') {
+                    const m = details.match(reDone);
+                    if (m) {
+                        const name = m[1].trim();
+                        active.delete(name);
+                    }
+                }
+            }
+            // считаем возраст
+            const now = Date.now();
+            const result = [];
+            for (const j of active.values()) {
+                const ageSec = j.startedMs ? Math.floor((now - j.startedMs) / 1000) : 0;
+                result.push({
+                    name: j.name, amount: j.amount, produced: 0,
+                    age_sec: ageSec, status: 'идёт'
+                });
+            }
+            // сортируем по убыванию возраста (новые сверху)
+            result.sort((a, b) => (a.age_sec || 0) - (b.age_sec || 0));
+            return result;
+        }
+
+        // Считаем сколько крафтер завершил/провалил из логов
+        function inferCrafterCountersFromLogs() {
+            const logs = (window.LOGS_STATE && window.LOGS_STATE.shared) ? window.LOGS_STATE.shared : [];
+            let completed = 0, failed = 0;
+            for (const log of logs) {
+                if (!log || log.user !== 'crafter') continue;
+                const a = String(log.action || '').toUpperCase();
+                if (a.startsWith('ЗАВЕРШЁН')) completed++;
+                else if (a === 'ПРОВАЛ') failed++;
+            }
+            return { completed, failed };
+        }
+
+        // === Статус автокрафтера (читается из /crafter_status, fallback — логи) ===
         function renderCrafterStatus() {
             const body = document.getElementById('crafter-status-body');
             const meta = document.getElementById('crafter-status-meta');
             const block = document.getElementById('crafter-status-block');
-            const s = window.CRAFTER_STATUS;
+            let s = window.CRAFTER_STATUS;
+
+            // Fallback: если /crafter_status пустой — пробуем построить статус из логов
             if (!s) {
-                body.innerHTML = '<div class="text-gray-500">Статус ещё не получен. Запусти crafter в игре и подожди ~10 секунд.</div>';
-                meta.textContent = '';
-                block.className = 'bg-gray-800 shadow rounded-lg border border-gray-700 mb-6 p-4';
-                return;
+                const jobs = inferActiveJobsFromLogs();
+                const cnt = inferCrafterCountersFromLogs();
+                if (!jobs.length && cnt.completed === 0 && cnt.failed === 0) {
+                    body.innerHTML =
+                        '<div class="text-gray-500 mb-2">⚠ Узел <code class="text-blue-300">/crafter_status</code> в Firebase пустой.</div>'
+                      + '<div class="text-xs text-gray-500">'
+                      + 'Возможные причины:<br>'
+                      + '• На компе с crafter.lua устаревшая версия — перезалей <code>installer</code> и перезапусти <code>crafter</code>.<br>'
+                      + '• В правилах Firebase нет разрешения на запись <code>/crafter_status</code> — добавь в Database Rules:<br>'
+                      + '<pre class="bg-gray-900 p-2 mt-1 rounded text-[10px] overflow-x-auto">"crafter_status": { ".read": "auth != null", ".write": "auth != null" }</pre>'
+                      + '• Crafter сейчас не запущен в игре.<br>'
+                      + '</div>';
+                    meta.innerHTML = '<span class="inline-block w-2.5 h-2.5 rounded-full bg-gray-600"></span> <span class="text-gray-500">нет данных</span>';
+                    return;
+                }
+                // строим минимальный snapshot из логов
+                s = {
+                    updated_at: null,
+                    me_ok: true, db_ok: true, paused: false,
+                    max_concurrent: '?',
+                    active_count: jobs.length,
+                    cpu_info: null,
+                    issues: [],
+                    active_jobs: jobs,
+                    total_completed: cnt.completed,
+                    total_failed: cnt.failed,
+                    _fromLogs: true,
+                };
             }
 
             // вычисляем «свежесть» по updated_at вида "YYYY-MM-DD HH:MM:SS"
@@ -1103,22 +1192,29 @@
                     if (ageSec > 30) online = false;
                 }
             }
-            // если crafter явно сказал «paused» через offline-snapshot — это не «оффлайн по времени»
             const explicitlyDown = !s.me_ok && !s.db_ok && Array.isArray(s.issues) &&
                 s.issues.some(i => /остановлена/i.test(String(i)));
 
-            const onlineDot = (online && !explicitlyDown)
-                ? '<span class="inline-block w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse"></span>'
-                : '<span class="inline-block w-2.5 h-2.5 rounded-full bg-red-500"></span>';
-            const onlineText = (online && !explicitlyDown)
-                ? '<span class="text-green-400 font-semibold">ON</span>'
-                : '<span class="text-red-400 font-semibold">OFF</span>';
-            const ageLabel = ageSec < 60 ? (ageSec + ' сек назад')
-                          : ageSec < 3600 ? (Math.floor(ageSec/60) + ' мин назад')
-                          : (Math.floor(ageSec/3600) + ' ч назад');
+            // Если работаем по fallback — индикатор отдельный
+            if (s._fromLogs) {
+                meta.innerHTML = '<span class="inline-block w-2.5 h-2.5 rounded-full bg-yellow-400"></span> '
+                    + '<span class="text-yellow-400 font-semibold">PARTIAL</span>'
+                    + '<span class="text-gray-500 ml-3">данные из логов — </span>'
+                    + '<span class="text-gray-400">нет /crafter_status</span>';
+            } else {
+                const onlineDot = (online && !explicitlyDown)
+                    ? '<span class="inline-block w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse"></span>'
+                    : '<span class="inline-block w-2.5 h-2.5 rounded-full bg-red-500"></span>';
+                const onlineText = (online && !explicitlyDown)
+                    ? '<span class="text-green-400 font-semibold">ON</span>'
+                    : '<span class="text-red-400 font-semibold">OFF</span>';
+                const ageLabel = ageSec < 60 ? (ageSec + ' сек назад')
+                              : ageSec < 3600 ? (Math.floor(ageSec/60) + ' мин назад')
+                              : (Math.floor(ageSec/3600) + ' ч назад');
 
-            meta.innerHTML = onlineDot + ' ' + onlineText
-                + '<span class="text-gray-500 ml-3">обновлён: ' + neiEsc(s.updated_at || '—') + ' (' + ageLabel + ')</span>';
+                meta.innerHTML = onlineDot + ' ' + onlineText
+                    + '<span class="text-gray-500 ml-3">обновлён: ' + neiEsc(s.updated_at || '—') + ' (' + ageLabel + ')</span>';
+            }
 
             // Индикаторы
             const meOk = s.me_ok ? '<span class="text-green-400">ME: OK</span>' : '<span class="text-red-400">ME: ОТКЛ</span>';
