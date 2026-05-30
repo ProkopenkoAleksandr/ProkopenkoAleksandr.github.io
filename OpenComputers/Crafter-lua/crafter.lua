@@ -30,7 +30,11 @@ if maxConcurrent < 1 then maxConcurrent = 1 end
 -- ===== Состояние =====
 local activeJobs = {}  -- [key] = {job, name, amount, started_at, key, id, damage, start_stock, produced}
 local recentLog = {}   -- лог в памяти (новые сверху)
-local MAX_LOG_LINES = 60
+local MAX_LOG_LINES = 25       -- было 60 — на OC экономим RAM
+local JOB_TTL_SEC = 3600       -- max возраст job в activeJobs — иначе принудительно убираем (1 час)
+local MAX_LOG_LINE_LEN = 180   -- обрезаем длинные details, чтобы не накапливать гигантские строки
+local TICKS_PER_GC = 10        -- запускать GC каждые N итераций event-loop'а
+local tickCounter = 0
 
 local lastTickAt = -INTERVAL  -- чтобы первый тик случился сразу
 local secondsToTick = 0
@@ -46,6 +50,16 @@ local lastProgressAt = 0
 
 -- Кэш последнего загруженного списка товаров (для добивания очереди между тиками)
 local cachedItems = nil
+
+-- Проблемы для отчёта (issues) — что мешает работе. Обновляются в tick().
+local issues = {}
+local cpuInfo = nil   -- { total, busy, free }
+local lastTickWallTime = nil
+
+-- Публикация статуса в БД (раз в N секунд)
+local STATUS_PUBLISH_INTERVAL = 15  -- было 5: реже = меньше JSON-аллокаций на тик
+local lastStatusAt = 0
+local statusPublishedOnce = false
 
 -- =========================================================
 -- УТИЛИТЫ
@@ -81,6 +95,8 @@ local function getRealTime()
 end
 
 local function pushLog(line)
+    -- защита от очень длинных строк (логи могут есть RAM)
+    if #line > MAX_LOG_LINE_LEN then line = line:sub(1, MAX_LOG_LINE_LEN) .. "…" end
     table.insert(recentLog, 1, line)
     while #recentLog > MAX_LOG_LINES do table.remove(recentLog) end
 end
@@ -93,16 +109,23 @@ local function log(action, details)
     local fileLine = string.format("[%s] %s | crafter | %s", t, action, details or "")
     local f = io.open("/home/crafter.log", "a")
     if f then f:write(fileLine .. "\n"); f:close() end
+    -- ротация лога: триггеримся реже и читаем только хвост, чтобы не аллоцировать огромный list
     local sz = fs.size("/home/crafter.log")
-    if sz and sz > 100000 then
-        local lines = {}
+    if sz and sz > 50000 then
+        -- сохраняем последние ~10 KB
         local fr = io.open("/home/crafter.log", "r")
-        if fr then for l in fr:lines() do table.insert(lines, l) end; fr:close() end
-        local fw = io.open("/home/crafter.log", "w")
-        if fw then
-            local start = math.max(1, #lines - 200)
-            for i = start, #lines do fw:write(lines[i] .. "\n") end
-            fw:close()
+        if fr then
+            fr:seek("end", -10000)
+            local tail = fr:read("*a") or ""
+            fr:close()
+            local fw = io.open("/home/crafter.log", "w")
+            if fw then
+                -- первая строка может быть обрезанной — отбрасываем до первого \n
+                local nl = tail:find("\n", 1, true)
+                if nl then tail = tail:sub(nl + 1) end
+                fw:write(tail)
+                fw:close()
+            end
         end
     end
     -- В БД (опционально, не блокируем)
@@ -201,6 +224,7 @@ local function jobStatus(j)
 end
 
 local function pruneFinishedJobs()
+    local now = computer.uptime()
     for key, j in pairs(activeJobs) do
         local s = jobStatus(j)
         if s == "готов" then
@@ -214,6 +238,16 @@ local function pruneFinishedJobs()
             totalFailed = totalFailed + 1
             log("ПРОВАЛ", j.name .. " x" .. j.amount)
             activeJobs[key] = nil
+        else
+            -- TTL: если job висит дольше JOB_TTL_SEC, считаем зависшим и убираем
+            -- (попытаемся cancel'нуть; не страшно если не получится)
+            if (now - (j.started_at or now)) > JOB_TTL_SEC then
+                totalFailed = totalFailed + 1
+                log("ТАЙМАУТ", j.name .. " x" .. j.amount .. " (висел " .. JOB_TTL_SEC .. "с)")
+                pcall(function() j.job.cancel() end)
+                pcall(function() j.job.Cancel() end)
+                activeJobs[key] = nil
+            end
         end
     end
 end
@@ -260,6 +294,93 @@ local function cancelJob(j)
     local ok = pcall(function() j.job.cancel() end)
     if not ok then pcall(function() j.job.Cancel() end) end
     return true
+end
+
+-- =========================================================
+-- ИНФА О CRAFTING CPU В AE-СЕТИ
+-- =========================================================
+local function getCpuInfo()
+    for addr in component.list("me_interface") do
+        local proxy = component.proxy(addr)
+        local ok, cpus = pcall(function() return proxy.getCpus() end)
+        if ok and cpus then
+            local total, busy = 0, 0
+            for _, c in ipairs(cpus) do
+                total = total + 1
+                if c.busy then busy = busy + 1 end
+            end
+            return { total = total, busy = busy, free = total - busy }
+        end
+    end
+    return nil
+end
+
+-- =========================================================
+-- ПУБЛИКАЦИЯ СТАТУСА В FIREBASE /crafter_status
+-- =========================================================
+local function publishStatus(force)
+    if not config.use_database then return end
+    if not config.firebase_url or config.firebase_url == "" or config.firebase_url == "заменить" then return end
+    if not component.isAvailable("internet") then return end
+    local now = computer.uptime()
+    if not force and (now - lastStatusAt) < STATUS_PUBLISH_INTERVAL then return end
+    lastStatusAt = now
+
+    -- собираем активные крафты в сериализуемом виде (ограничиваем 20 чтобы JSON не разбух)
+    local jobsArr = {}
+    local arr = {}
+    for _, j in pairs(activeJobs) do table.insert(arr, j) end
+    table.sort(arr, function(a, b) return (a.started_at or 0) > (b.started_at or 0) end)
+    local MAX_JOBS_IN_STATUS = 20
+    for i = 1, math.min(#arr, MAX_JOBS_IN_STATUS) do
+        local j = arr[i]
+        local ok_d, done = pcall(function() return j.job.isDone() end)
+        local ok_c, cancel = pcall(function() return j.job.isCanceled() end)
+        local ok_f, failed = pcall(function() return j.job.hasFailed() end)
+        local stat = "идёт"
+        if ok_d and done then stat = "готов"
+        elseif ok_c and cancel then stat = "отменён"
+        elseif ok_f and failed then stat = "провален" end
+        table.insert(jobsArr, {
+            id = j.id, damage = j.damage,
+            name = j.name, amount = j.amount,
+            produced = j.produced or 0,
+            age_sec = math.floor(now - (j.started_at or now)),
+            status = stat,
+        })
+    end
+
+    local snapshot = {
+        updated_at = getRealTime(),
+        last_tick_at = lastTickWallTime,
+        me_ok = meOk,
+        db_ok = dbOk,
+        paused = paused,
+        max_concurrent = maxConcurrent,
+        active_count = #arr,
+        cpu_info = cpuInfo,
+        issues = issues,
+        active_jobs = jobsArr,
+        total_completed = totalCompleted,
+        total_failed = totalFailed,
+    }
+    local body = json.encode(snapshot)
+    local ok, res = network.put("/crafter_status", body)
+    if not ok then
+        log("STATUS_ERR", "network.put провалился: " .. tostring(res))
+    elseif type(res) == "string" and (res:find("error", 1, true) or res:find("Permission", 1, true)) then
+        log("STATUS_ERR", "Firebase ответил: " .. tostring(res):sub(1, 200))
+    else
+        -- первая успешная публикация → одна запись в лог, чтобы было видно что работает
+        if not statusPublishedOnce then
+            statusPublishedOnce = true
+            log("СТАТУС", "опубликован в /crafter_status (" .. #body .. " байт)")
+        end
+    end
+end
+
+local function pushIssue(msg)
+    table.insert(issues, msg)
 end
 
 -- =========================================================
@@ -323,16 +444,35 @@ end
 local function tick()
     pruneFinishedJobs()
 
+    -- собираем issues заново каждый тик
+    issues = {}
+    cpuInfo = getCpuInfo()
+    lastTickWallTime = getRealTime()
+
     local stocks, gotStocks = getStocks()
     meOk = gotStocks
     if not gotStocks then
+        pushIssue("Нет связи с me_interface — Adapter и ME Interface должны быть рядом")
         log("ОШИБКА", "Нет связи с me_interface")
+        publishStatus(true)
         return
+    end
+
+    if not cpuInfo then
+        pushIssue("Не удалось получить список Crafting CPU")
+    elseif cpuInfo.total == 0 then
+        pushIssue("В AE-сети НЕТ Crafting CPU. Поставь Crafting Storage + Co-Processor.")
+    elseif cpuInfo.free == 0 then
+        pushIssue("Все " .. cpuInfo.total .. " Crafting CPU заняты — новые крафты в очереди")
     end
 
     local items = loadCrafterItems()
     dbOk = (items ~= nil)
-    if not items then return end
+    if not items then
+        pushIssue("Не удалось загрузить /crafter из Firebase")
+        publishStatus(true)
+        return
+    end
     cachedItems = items  -- запоминаем для tryFillSlots между тиками
 
     local requested = 0
@@ -340,6 +480,7 @@ local function tick()
     local capped = 0
     local skipped = 0
     local disabled = 0
+    local noPattern = {}  -- предметы без паттерна, для подробного отчёта
     for _, it in ipairs(items) do
         if it.enabled == false then
             disabled = disabled + 1
@@ -369,11 +510,21 @@ local function tick()
                             .. " (stock=" .. stock .. "/" .. keep .. ")")
                     else
                         skipped = skipped + 1
+                        table.insert(noPattern, (it.name or it.id) .. " (" .. it.id .. ":" .. dmg .. ")")
                     end
                 end
             end
         end
     end
+    -- агрегируем проблему "нет паттерна" в одну запись
+    if #noPattern > 0 then
+        local shown = {}
+        for i = 1, math.min(5, #noPattern) do table.insert(shown, noPattern[i]) end
+        local msg = "Нет паттерна для: " .. table.concat(shown, ", ")
+        if #noPattern > 5 then msg = msg .. " и ещё " .. (#noPattern - 5) end
+        pushIssue(msg)
+    end
+
     if requested > 0 or already > 0 or capped > 0 or skipped > 0 then
         log("ТИК", string.format(
             "заказано=%d, уже_крафтится=%d, в_очереди=%d, не_craftable=%d, выкл=%d, всего=%d, лимит=%d",
@@ -382,6 +533,8 @@ local function tick()
 
     -- сразу пересчитываем прогресс по уже полученным стокам (без двойного запроса в ME)
     updateProgress(stocks)
+
+    publishStatus(true)
 end
 
 -- =========================================================
@@ -449,6 +602,19 @@ local function handleClick(id)
         if stocks then tryFillSlots(stocks) else tryFillSlots() end
     elseif id == "quit" then
         log("СТОП", "Выход по кнопке")
+        -- финальный статус для админки: «не на связи»
+        pcall(function()
+            local final = {
+                updated_at = getRealTime(),
+                me_ok = false, db_ok = false, paused = true,
+                max_concurrent = maxConcurrent, active_count = 0,
+                cpu_info = nil,
+                issues = { "Программа крафтера остановлена" },
+                active_jobs = {},
+                total_completed = totalCompleted, total_failed = totalFailed,
+            }
+            network.put("/crafter_status", json.encode(final))
+        end)
         gpu = component.gpu
         gpu.setBackground(0x000000); gpu.setForeground(0xFFFFFF)
         require("term").clear()
@@ -492,6 +658,22 @@ local function loop()
         pruneFinishedJobs()
         local stocks = updateProgress()
         if stocks then tryFillSlots(stocks) end
+        stocks = nil  -- освобождаем ссылку чтобы GC мог собрать большую таблицу
+        publishStatus()  -- rate-limited
+
+        -- Периодический GC + диагностика памяти
+        tickCounter = tickCounter + 1
+        if tickCounter >= TICKS_PER_GC then
+            tickCounter = 0
+            collectgarbage("collect")
+            -- если использование выше 70% — пишем предупреждение
+            local total = computer.totalMemory()
+            local free = computer.freeMemory()
+            local usedPct = math.floor((total - free) * 100 / total)
+            if usedPct >= 85 then
+                log("MEM", string.format("использовано %d%% (%d/%d KB) — близко к лимиту", usedPct, (total-free)/1024, total/1024))
+            end
+        end
 
         local ev = { event.pull(1) }
         local name = ev[1]
