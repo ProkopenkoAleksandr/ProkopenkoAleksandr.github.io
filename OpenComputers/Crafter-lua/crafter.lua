@@ -693,17 +693,19 @@ local function loop()
         stocks = nil  -- освобождаем ссылку чтобы GC мог собрать большую таблицу
         publishStatus()  -- rate-limited
 
-        -- Периодический GC + диагностика памяти
+        -- Периодическая диагностика памяти (OC сам делает GC, collectgarbage в sandbox недоступен)
         tickCounter = tickCounter + 1
         if tickCounter >= TICKS_PER_GC then
             tickCounter = 0
-            collectgarbage("collect")
-            -- если использование выше 70% — пишем предупреждение
+            pcall(function() if collectgarbage then collectgarbage("collect") end end)
             local total = computer.totalMemory()
             local free = computer.freeMemory()
-            local usedPct = math.floor((total - free) * 100 / total)
-            if usedPct >= 85 then
-                log("MEM", string.format("использовано %d%% (%d/%d KB) — близко к лимиту", usedPct, (total-free)/1024, total/1024))
+            if total and total > 0 then
+                local usedPct = math.floor((total - free) * 100 / total)
+                if usedPct >= 85 then
+                    log("MEM", string.format("использовано %d%% (%d/%d KB)",
+                        usedPct, math.floor((total-free)/1024), math.floor(total/1024)))
+                end
             end
         end
 
