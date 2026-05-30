@@ -32,6 +32,7 @@ local activeJobs = {}  -- [key] = {job, name, amount, started_at, key, id, damag
 local JOB_TTL_SEC = 3600       -- max возраст job в activeJobs — иначе принудительно убираем (1 час)
 local TICKS_PER_GC = 10        -- диагностика памяти каждые N итераций event-loop'а
 local tickCounter = 0
+local memWarnedLowOnce = false
 
 local lastTickAt = -INTERVAL  -- чтобы первый тик случился сразу
 local secondsToTick = 0
@@ -41,8 +42,8 @@ local dbOk = false
 local totalCompleted = 0
 local totalFailed = 0
 
--- Опрос стоков для прогресса (раз в N секунд)
-local PROGRESS_POLL = 5
+-- Опрос стоков для прогресса (раз в N секунд) — увеличено для экономии RAM
+local PROGRESS_POLL = 30
 local lastProgressAt = 0
 
 -- Кэш последнего загруженного списка товаров (для добивания очереди между тиками)
@@ -53,13 +54,13 @@ local issues = {}
 local cpuInfo = nil   -- { total, busy, free }
 local lastTickWallTime = nil
 
--- Публикация статуса в БД (раз в N секунд)
-local STATUS_PUBLISH_INTERVAL = 15  -- было 5: реже = меньше JSON-аллокаций на тик
+-- Публикация статуса в БД (раз в N секунд) — реже = меньше JSON-аллокаций
+local STATUS_PUBLISH_INTERVAL = 60
 local lastStatusAt = 0
 local statusPublishedOnce = false
 
 -- Heartbeat для дашборда: маленький snapshot со временем последней активности
-local HEARTBEAT_INTERVAL = 30
+local HEARTBEAT_INTERVAL = 60
 local lastHeartbeatAt = 0
 local startedAt = nil  -- инициализируем при первом heartbeat'е
 
@@ -88,9 +89,10 @@ local function getRealTime()
     local tmp_file = "/home/HostTime.tmp"
     local f = io.open(tmp_file, "w")
     if f then
-        f:write(""); f:close()
+        pcall(function() f:write("") end)
+        pcall(function() f:close() end)
         local lm = fs.lastModified(tmp_file)
-        fs.remove(tmp_file)
+        pcall(function() fs.remove(tmp_file) end)
         if lm and lm > 0 then return formatUnixTime(math.floor(lm / 1000) + tz * 3600) end
     end
     return os.date("%Y-%m-%d %H:%M:%S") .. " (игр)"
@@ -130,13 +132,15 @@ local function loadCrafterItems()
             return {}
         end
         local parsed = json.decode(res)
+        res = nil  -- освобождаем строку ответа, она может быть большой
         if not parsed then log("ОШИБКА", "Невалидный JSON в /crafter"); return nil end
-        if not parsed.items then return {} end
+        if not parsed.items then parsed = nil; return {} end
         local arr = {}
         if type(parsed.items) == "table" then
             if #parsed.items > 0 then arr = parsed.items
             else for _, v in pairs(parsed.items) do table.insert(arr, v) end end
         end
+        parsed = nil
         return arr
     end
     local f = io.open("/home/crafter_data.json", "r")
@@ -300,12 +304,12 @@ end
 local function getRealTimeMs()
     local tmp = "/home/HostTime.tmp"
     local f = io.open(tmp, "w")
-    if f then
-        f:write(""); f:close()
-        local lm = fs.lastModified(tmp)
-        fs.remove(tmp)
-        if lm and lm > 0 then return lm end
-    end
+    if not f then return nil end
+    pcall(function() f:write("") end)
+    pcall(function() f:close() end)
+    local lm = fs.lastModified(tmp)
+    pcall(function() fs.remove(tmp) end)
+    if lm and lm > 0 then return lm end
     return nil
 end
 
@@ -659,7 +663,9 @@ end
 -- ОСНОВНОЙ ЦИКЛ
 -- =========================================================
 -- Если на диске остался старый лог от прошлых версий — удаляем его
+-- Удаляем осколки от прошлых версий программы
 pcall(function() if fs.exists("/home/crafter.log") then fs.remove("/home/crafter.log") end end)
+pcall(function() if fs.exists("/home/HostTime.tmp") then fs.remove("/home/HostTime.tmp") end end)
 
 log("СТАРТ", string.format("interval=%ds, default_amount=%d, max_concurrent=%d",
     INTERVAL, DEFAULT_AMOUNT, maxConcurrent))
@@ -686,8 +692,7 @@ local function loop()
         publishStatus()  -- rate-limited
         sendHeartbeat()  -- raz в 30 сек heartbeat для дашборда
 
-        -- Периодическая диагностика памяти. OC выполняет GC сам, ручной вызов не нужен
-        -- (collectgarbage в sandbox 1.7.10 недоступен и упадёт).
+        -- Диагностика RAM: warning при 80%, авто-сброс кешей при 90%, авто-reboot если не помогло
         tickCounter = tickCounter + 1
         if tickCounter >= TICKS_PER_GC then
             tickCounter = 0
@@ -695,9 +700,47 @@ local function loop()
             local free = computer.freeMemory()
             if total and total > 0 then
                 local usedPct = math.floor((total - free) * 100 / total)
-                if usedPct >= 85 then
-                    log("MEM", string.format("использовано %d%% (%d/%d KB)",
+
+                -- WARNING (80%) — однократный
+                if usedPct >= 80 and not memWarnedLowOnce then
+                    memWarnedLowOnce = true
+                    log("⚠ RAM ПЕРЕПОЛНЕНА", string.format(
+                        "Оперативка OC-компьютера занята на %d%% (%d/%d KB). " ..
+                        "Программа близка к Out Of Memory — поставь больше RAM-плашек в Computer Case " ..
+                        "или подними интервалы синка в config.lua.",
                         usedPct, math.floor((total-free)/1024), math.floor(total/1024)))
+                end
+                if usedPct < 60 then memWarnedLowOnce = false end
+
+                -- АВАРИЙНЫЙ СБРОС при 90% — обнуляем кеши, даём GC сработать
+                if usedPct >= 90 then
+                    log("⚠ RAM КРИТИЧНО", string.format(
+                        "RAM %d%%, очищаю кеши: cachedItems, activeJobs done-jobs, " ..
+                        "renderResults. Sleep 0.5s для GC.", usedPct))
+                    cachedItems = nil
+                    -- удаляем все ссылки на завершённые job-объекты
+                    for k, j in pairs(activeJobs) do
+                        local ok, done = pcall(function() return j.job.isDone() end)
+                        if ok and done then activeJobs[k] = nil end
+                    end
+                    os.sleep(0.5)  -- GC time
+
+                    local free2 = computer.freeMemory()
+                    local usedPct2 = math.floor((total - free2) * 100 / total)
+                    if usedPct2 >= 90 then
+                        -- сброс не помог — перезагружаем комп.
+                        -- Даём 10 сек на отправку финального heartbeat'а — дашборд успеет показать "STOPPED"
+                        log("⚠ АВАРИЙНЫЙ ПЕРЕЗАГРУЗ", string.format(
+                            "После сброса кешей RAM = %d%%. Reboot через 10 сек. " ..
+                            "После reboot программа автостартует из /home/.shrc.",
+                            usedPct2))
+                        pcall(function() if sendHeartbeat then sendHeartbeat(true) end end)
+                        os.sleep(10)
+                        computer.shutdown(true)
+                    else
+                        log("✓ RAM ВОССТАНОВЛЕНА", string.format(
+                            "Сброс помог: было %d%%, стало %d%%", usedPct, usedPct2))
+                    end
                 end
             end
         end

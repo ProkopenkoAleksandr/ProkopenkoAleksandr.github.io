@@ -84,18 +84,18 @@ local function getRealTime()
     
     local file = io.open(tmp_file, "w")
     if file then
-        file:write("")
-        file:close()
-        
+        pcall(function() file:write("") end)
+        pcall(function() file:close() end)
+
         local lastModifiedMs = fs.lastModified(tmp_file)
-        fs.remove(tmp_file)
-        
+        pcall(function() fs.remove(tmp_file) end)
+
         if lastModifiedMs and lastModifiedMs > 0 then
             local current_unix = math.floor(lastModifiedMs / 1000)
             return formatUnixTime(current_unix + (tz * 3600))
         end
     end
-    
+
     return os.date("%Y-%m-%d %H:%M:%S") .. " (Игр.)"
 end
 
@@ -108,12 +108,12 @@ local startedAt_hb = nil
 local function getRealTimeMs_hb()
     local tmp = "/home/HostTime.tmp"
     local f = io.open(tmp, "w")
-    if f then
-        f:write(""); f:close()
-        local lm = fs.lastModified(tmp)
-        fs.remove(tmp)
-        if lm and lm > 0 then return lm end
-    end
+    if not f then return nil end
+    pcall(function() f:write("") end)
+    pcall(function() f:close() end)
+    local lm = fs.lastModified(tmp)
+    pcall(function() fs.remove(tmp) end)
+    if lm and lm > 0 then return lm end
     return nil
 end
 
@@ -141,7 +141,11 @@ local function sendHeartbeat(stopped)
             ["X-HTTP-Method-Override"] = "PUT",
         }
         local handle = internet.request(url, body, headers, "POST")
-        for _ in handle do end  -- drain
+        for _ in handle do end  -- drain (необходимо для отправки запроса)
+        -- Закрываем handle явно, иначе TCP-буфер OC утекает
+        pcall(function() handle:close() end)
+        pcall(function() if handle.close then handle.close(handle) end end)
+        handle = nil; body = nil; headers = nil; url = nil
     end)
 end
 
@@ -156,7 +160,10 @@ local function writeLog(action, user, details)
 end
 
 -- Удаляем старый локальный лог-файл (если остался от прошлых версий)
+-- Удаляем осколки от прошлых версий программы
 pcall(function() if fs.exists("/home/casino_logs.txt") then fs.remove("/home/casino_logs.txt") end end)
+pcall(function() if fs.exists("/home/casino_crash.log") then fs.remove("/home/casino_crash.log") end end)
+pcall(function() if fs.exists("/home/HostTime.tmp") then fs.remove("/home/HostTime.tmp") end end)
 
 local function loadLogsLocal(filter)
     -- Логи теперь только в админке сайта

@@ -93,7 +93,7 @@ function gui.drawSearch(search_query, focused)
     local inputW = leftW - inputX - resetW - 2
     if inputW < 10 then inputW = 10 end
 
-    local placeholder = "[кликни и печатай — esc/enter чтобы закончить]"
+    local placeholder = "[кликни и печатай — enter чтобы закончить]"
     local inputBg, inputFg, shownRaw
     if focused then
         inputBg = gui.COLORS.inputFocus

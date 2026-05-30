@@ -34,7 +34,7 @@ local active_category = "ВСЕ"
 local currentUser = nil
 local idleTimer = 0
 local msgTimer = 0
-local syncTimer = 15
+local syncTimer = 60   -- реже sync = меньше памяти на парсинг JSON
 
 -- Heartbeat для дашборда (функция объявлена ниже, после getRealTime)
 local heartbeatTimer = 0
@@ -79,9 +79,11 @@ local function getRealTime()
     local tmp_file = "/home/HostTime.tmp"
     local file = io.open(tmp_file, "w")
     if file then
-        file:write(""); file:close()
+        -- pcall гарантирует close() даже если write упадёт
+        pcall(function() file:write("") end)
+        pcall(function() file:close() end)
         local lastModifiedMs = fs.lastModified(tmp_file)
-        fs.remove(tmp_file)
+        pcall(function() fs.remove(tmp_file) end)
         if lastModifiedMs and lastModifiedMs > 0 then
             local current_unix = math.floor(lastModifiedMs / 1000)
             return formatUnixTime(current_unix + (tz * 3600))
@@ -95,12 +97,12 @@ end
 local function getRealTimeMs()
     local tmp = "/home/HostTime.tmp"
     local f = io.open(tmp, "w")
-    if f then
-        f:write(""); f:close()
-        local lm = fs.lastModified(tmp)
-        fs.remove(tmp)
-        if lm and lm > 0 then return lm end
-    end
+    if not f then return nil end
+    pcall(function() f:write("") end)
+    pcall(function() f:close() end)
+    local lm = fs.lastModified(tmp)
+    pcall(function() fs.remove(tmp) end)
+    if lm and lm > 0 then return lm end
     return nil
 end
 
@@ -140,7 +142,10 @@ local function writeLog(action, user, details)
 end
 
 -- Старый локальный лог-файл больше не нужен — если остался от прошлых версий, удаляем
+-- Удаляем осколки от прошлых версий программы
 pcall(function() if fs.exists("/home/shop_logs.txt") then fs.remove("/home/shop_logs.txt") end end)
+pcall(function() if fs.exists("/home/shop_crash.log") then fs.remove("/home/shop_crash.log") end end)
+pcall(function() if fs.exists("/home/HostTime.tmp") then fs.remove("/home/HostTime.tmp") end end)
 
 local function loadLogsLocal(filter)
     -- больше не используется — оставлена-заглушка для совместимости старого UI.
@@ -160,10 +165,12 @@ end
 
 local function loadUsersLocal()
     local f = io.open("/home/users.json", "r")
-    if f then
-        local data = f:read("*a")
-        if data and data ~= "" then users_db = json.decode(data) or {} end
-        f:close()
+    if not f then return end
+    local ok, data = pcall(function() return f:read("*a") end)
+    pcall(function() f:close() end)
+    if ok and data and data ~= "" then
+        users_db = json.decode(data) or {}
+        data = nil
     end
 end
 
@@ -210,17 +217,21 @@ local function loadDB()
         local succ_shop, res_shop = network.get("/shop")
         if succ_shop and res_shop and res_shop ~= "null" then
             local parsed = json.decode(res_shop)
+            res_shop = nil  -- освобождаем большую строку ответа
             if parsed then
                 if parsed.categories then categories = parsed.categories end
                 if parsed.items then shop_items = parsed.items end
                 if parsed.buyback then shop_buyback = parsed.buyback end
                 if parsed.shop_name then shop_name = parsed.shop_name end
             end
+            parsed = nil
         else loadShopLocal() end
         local succ_u, res_u = network.get("/users")
         if succ_u and res_u and res_u ~= "null" then
             local parsed_u = json.decode(res_u)
+            res_u = nil
             if parsed_u then users_db = parsed_u end
+            parsed_u = nil
         else loadUsersLocal() end
     else
         loadShopLocal()
@@ -316,6 +327,92 @@ local function showMsg(title, text, isError, timeout)
     gui.drawNotification(title, text, isError)
 end
 
+-- Диагностика RAM: warning 80%, авто-сброс кешей 90%, авто-reboot если не помогло
+local memCheckTimer = 0
+local memWarnedLowOnce = false
+-- Отложенный reboot: если игрок сейчас в магазине — ждём пока выйдет или истечёт таймер
+local pendingReboot = false
+local rebootDeadline = 0       -- computer.uptime() когда ребутить принудительно
+local MAX_REBOOT_GRACE = 60    -- максимум секунд, в которые ждём активного игрока
+
+local function executeRebootNow(reasonPct)
+    writeLog("⚠ АВАРИЙНЫЙ ПЕРЕЗАГРУЗ", "shop", string.format(
+        "RAM = %d%%, перезагружаю комп. После reboot программа автостартует из /home/.shrc",
+        reasonPct or 0))
+    pcall(function() if sendHeartbeat then sendHeartbeat(true) end end)
+    os.sleep(0.5)
+    computer.shutdown(true)
+end
+
+-- Вызывается каждый тик, чтобы обновлять countdown и принять решение
+local function maintainPendingReboot()
+    if not pendingReboot then return end
+    local now = computer.uptime()
+    local secLeft = math.max(0, math.ceil(rebootDeadline - now))
+    -- если игрок вышел или таймер истёк — ребут
+    if currentUser == nil or secLeft <= 0 then
+        executeRebootNow()
+        return
+    end
+    -- иначе обновляем сообщение
+    state = "modal_msg"
+    msgTimer = 5  -- защита от закрытия
+    gui.drawNotification("⚠ ПЕРЕЗАГРУЗКА КОМПЬЮТЕРА",
+        "Заканчивается оперативная память. Магазин будет перезагружен через " ..
+        secLeft .. " сек. Завершите покупки или нажмите ВЫХОД.", true)
+end
+
+local function checkMemory()
+    memCheckTimer = memCheckTimer + 1
+    if memCheckTimer < 30 then return end
+    memCheckTimer = 0
+    local total = computer.totalMemory()
+    local free = computer.freeMemory()
+    if not (total and total > 0) then return end
+    local usedPct = math.floor((total - free) * 100 / total)
+
+    -- WARNING (80%) — однократный
+    if usedPct >= 80 and not memWarnedLowOnce then
+        memWarnedLowOnce = true
+        writeLog("⚠ RAM ПЕРЕПОЛНЕНА", "shop", string.format(
+            "Оперативка OC-компьютера занята на %d%% (%d/%d KB). " ..
+            "Программа близка к Out Of Memory — поставь больше RAM-плашек в Computer Case " ..
+            "или подними интервалы синка в config.lua.",
+            usedPct, math.floor((total-free)/1024), math.floor(total/1024)))
+    end
+    if usedPct < 60 then memWarnedLowOnce = false end
+
+    -- АВАРИЙНЫЙ СБРОС при 90% — обнуляем большие in-memory таблицы
+    if usedPct >= 90 and not pendingReboot then
+        writeLog("⚠ RAM КРИТИЧНО", "shop", string.format(
+            "RAM %d%%, очищаю кеши (users_db). Sleep 0.5s для GC.", usedPct))
+        users_db = {}
+        syncTimer = 1
+        os.sleep(0.5)
+
+        local free2 = computer.freeMemory()
+        local usedPct2 = math.floor((total - free2) * 100 / total)
+        if usedPct2 < 90 then
+            writeLog("✓ RAM ВОССТАНОВЛЕНА", "shop", string.format(
+                "Сброс помог: было %d%%, стало %d%%", usedPct, usedPct2))
+            return
+        end
+
+        -- Сброс не помог — планируем reboot
+        if currentUser == nil then
+            -- никто не пользуется — можно ребутить немедленно
+            executeRebootNow(usedPct2)
+        else
+            -- кто-то в магазине — даём grace-период до выхода
+            pendingReboot = true
+            rebootDeadline = computer.uptime() + MAX_REBOOT_GRACE
+            writeLog("⚠ ОТЛОЖЕННЫЙ ПЕРЕЗАГРУЗ", "shop", string.format(
+                "RAM = %d%%. Игрок %s в магазине — reboot через %d сек или после выхода.",
+                usedPct2, currentUser.name, MAX_REBOOT_GRACE))
+        end
+    end
+end
+
 loadDB()
 refreshScreen()
 
@@ -325,12 +422,17 @@ refreshScreen()
 local function shopTick()
     local ev, _, arg1, arg2, arg3, arg4, arg5 = event.pull(1)
 
-    -- Heartbeat для дашборда: раз в ~30 секунд
+    -- Heartbeat для дашборда: раз в ~60 секунд (реже = меньше RAM)
     heartbeatTimer = heartbeatTimer + 1
-    if heartbeatTimer >= 30 then
+    if heartbeatTimer >= 60 then
         heartbeatTimer = 0
         sendHeartbeat()
     end
+
+    -- Мониторинг RAM
+    checkMemory()
+    -- Если запланирован reboot — обновляем countdown / выполняем ребут когда можно
+    maintainPendingReboot()
 
     if not ev then
         local shouldRefreshFull = false
@@ -345,6 +447,8 @@ local function shopTick()
                 local bal = currentUser.balance
                 writeLog("ЛОГАУТ (АВТО)", name, "Бездействие. Баланс: " .. bal .. " " .. CUR)
                 currentUser = nil; cart = {}; state = "shop"; active_category = "ВСЕ"; currentPage = 1
+                -- сбрасываем UI-state, чтобы старые ссылки на shop_items[X] и т.п. не держали GC
+                ed_data = {}; selectedItem = nil; selectedQty = 1; search_query = ""; search_focus = false
                 shouldRefreshFull = true
             else
                 if state == "shop" or state == "modal_qty" or state == "cart" then gui.drawTick(currentUser, idleTimer) end
@@ -354,24 +458,28 @@ local function shopTick()
             if config.use_database and component.isAvailable("internet") then
                 syncTimer = syncTimer - 1
                 if syncTimer <= 0 then
-                    syncTimer = 15
+                    syncTimer = 60   -- было 15: реже синк = меньше JSON-аллокаций
                     local s, r = network.get("/shop")
                     if s and r and r ~= "null" then
                         local p = json.decode(r)
+                        r = nil  -- освобождаем большую строку
                         if p then
                             if p.categories then categories = p.categories end
                             if p.items then shop_items = p.items end
                             if p.buyback then shop_buyback = p.buyback end
                             if p.shop_name then shop_name = p.shop_name end
                         end
+                        p = nil
                     end
                     local su, ru = network.get("/users")
                     if su and ru and ru ~= "null" then
                         local pu = json.decode(ru)
+                        ru = nil
                         if pu then users_db = pu end
                         if currentUser and users_db[currentUser.name] then
                             currentUser.balance = users_db[currentUser.name].balance
                         end
+                        pu = nil
                     end
                     shouldRefreshFull = true
                 end
@@ -396,8 +504,8 @@ local function shopTick()
         elseif ev == "key_down" and state == "shop" and search_focus then
             local char = arg1; local code = arg2
             if currentUser then idleTimer = 30 end
-            if code == 28 or code == 1 then
-                -- enter / esc — снимаем фокус
+            if code == 28 then
+                -- enter — снимаем фокус
                 search_focus = false
             elseif code == 14 then
                 -- backspace
@@ -456,6 +564,11 @@ local function shopTick()
                     computer.beep(1000, 0.05)
                     -- любой клик кроме самого инпута поиска снимает фокус
                     if action ~= "search" and action ~= "clear_search" then search_focus = false end
+                    -- если идёт обратный отсчёт reboot — разрешаем только ВЫХОД
+                    if pendingReboot and action ~= "logout" then
+                        computer.beep(400, 0.1)
+                        action = nil
+                    end
                     
                     if action == "page_prev" then currentPage = currentPage - 1; refreshScreen()
                     elseif action == "page_next" then currentPage = currentPage + 1; refreshScreen()
@@ -587,7 +700,10 @@ local function shopTick()
                                 writeLog("ЛОГАУТ", currentUser.name,
                                     "Выход по кнопке. Баланс: " .. currentUser.balance .. " " .. CUR)
                             end
-                            currentUser = nil; cart = {}; currentPage = 1; refreshScreen()
+                            currentUser = nil; cart = {}; currentPage = 1
+                            ed_data = {}; selectedItem = nil; selectedQty = 1
+                            search_query = ""; search_focus = false
+                            refreshScreen()
                         elseif action == "admin_panel" then state = "admin_item"; adminPage = 1; refreshScreen()
                         elseif action == "search" then
                             -- клик по инпуту: ставим/снимаем фокус, дальше ввод идёт прямо в строку

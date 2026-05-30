@@ -1311,11 +1311,13 @@
             for (const log of view) {
                 const cat = logCategory(log);
                 const action = String(log.action || '');
+                const isRamWarn = action.includes('RAM');  // ⚠ RAM ПЕРЕПОЛНЕНА
                 let actionColor = 'text-gray-300';
                 if (action.includes('ПОКУПКА') || action.includes('ВЫИГРЫШ') || action.includes('ЗАВЕРШЁН') || action.includes('ДОБАВЛЕН')) actionColor = 'text-green-400';
                 else if (action.includes('ПРОДАЖА') || action.includes('СКУПКА') || action.includes('ПОПОЛНЕНИЕ') || action === 'ТИК') actionColor = 'text-yellow-400';
                 else if (action.includes('УДАЛ') || action.includes('ОШИБКА') || action.includes('ПРОВАЛ') || action.includes('CRASH') || action.includes('FATAL')) actionColor = 'text-red-400';
                 else if (action.includes('ЗАКАЗАН') || action.includes('СТАРТ')) actionColor = 'text-blue-400';
+                if (isRamWarn) actionColor = 'text-orange-400';
 
                 const catBadge = ({
                     casino:    '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-300 border border-purple-700/50">🎰 Казино</span>',
@@ -1324,17 +1326,26 @@
                     shop:      '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-900/40 text-green-300 border border-green-700/50">🏪 Магазин</span>',
                 })[cat] || '';
 
+                // RAM-warning отображаем целиком как контрастный alert-блок чтобы не путали с обычными ошибками
+                const wrapperCls = isRamWarn
+                    ? 'p-4 bg-orange-950/40 border-l-4 border-orange-500 hover:bg-orange-950/60 transition flex flex-col gap-1'
+                    : 'p-4 hover:bg-gray-750 transition flex flex-col gap-1';
+                const ramIcon = isRamWarn
+                    ? '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-900/60 text-orange-200 border border-orange-600">🧠 ПАМЯТЬ OC</span>'
+                    : '';
+
                 out.push(
-                    '<div class="p-4 hover:bg-gray-750 transition flex flex-col gap-1">'
+                    '<div class="' + wrapperCls + '">'
                   + '  <div class="flex flex-wrap justify-between items-center gap-x-4 gap-y-1">'
                   + '    <div class="flex items-center gap-2 flex-wrap">'
                   + '      ' + catBadge
+                  + '      ' + ramIcon
                   + '      <span class="font-bold text-base text-white">' + neiEsc(log.user || '—') + '</span>'
                   + '      <span class="text-sm font-bold bg-gray-900 px-2 py-0.5 rounded ' + actionColor + '">' + neiEsc(action) + '</span>'
                   + '    </div>'
                   + '    <span class="text-xs font-mono text-gray-400">' + neiEsc(String(log.time || '').replace(/\[|\]/g, '')) + '</span>'
                   + '  </div>'
-                  + '  <div class="text-sm text-gray-300 break-words mt-1">' + neiEsc(log.details || '') + '</div>'
+                  + '  <div class="text-sm ' + (isRamWarn ? 'text-orange-200' : 'text-gray-300') + ' break-words mt-1">' + neiEsc(log.details || '') + '</div>'
                   + '</div>'
                 );
             }

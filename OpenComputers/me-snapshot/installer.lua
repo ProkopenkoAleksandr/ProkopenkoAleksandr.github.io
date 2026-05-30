@@ -1,7 +1,7 @@
--- /lua/installer.lua  (ME-Snapshots)
+-- /lua/installer.lua  (ME-Snapshot)
 local internet = require("internet")
+local fs = require("filesystem")
 
--- ССЫЛКА НА ПАПКУ С ФАЙЛАМИ В РЕПОЗИТОРИИ НА GITHUB (со слешем на конце)
 local repo = "https://raw.githubusercontent.com/ProkopenkoAleksandr/ProkopenkoAleksandr.github.io/refs/heads/main/OpenComputers/me-snapshot/"
 
 local files = {
@@ -11,30 +11,51 @@ local files = {
     "me_snapshot.lua",
 }
 
-print("=== УСТАНОВКА ME-Snapshots ===")
+print("=== УСТАНОВКА ME-Snapshot ===")
 print("Подключение к GitHub...\n")
+
+local function download(url)
+    local handle
+    local ok, err_or_content = pcall(function()
+        handle = internet.request(url)
+        local parts = {}
+        for chunk in handle do parts[#parts + 1] = chunk end
+        return table.concat(parts)
+    end)
+    if handle then
+        pcall(function() handle:close() end)
+        pcall(function() if handle.close then handle.close(handle) end end)
+    end
+    if ok then return err_or_content end
+    return nil, tostring(err_or_content)
+end
 
 for _, file in ipairs(files) do
     io.write("Скачивание " .. file .. " ... ")
-    local url = repo .. file
-    local success, response = pcall(internet.request, url)
-    if success then
-        local content = ""
-        for chunk in response do content = content .. chunk end
-        if content:match("404: Not Found") then
-            print("[ОШИБКА: Файл не найден]")
-        else
-            local f = io.open("/home/" .. file, "w")
-            if f then f:write(content); f:close(); print("[OK]")
-            else print("[ОШИБКА записи файла]") end
-        end
+    local content, err = download(repo .. file)
+    if not content then
+        print("[ОШИБКА сети: " .. tostring(err) .. "]")
+    elseif content:match("404: Not Found") then
+        print("[ОШИБКА: Файл не найден на GitHub]")
     else
-        print("[ОШИБКА сети]")
+        local f = io.open("/home/" .. file, "w")
+        if f then
+            pcall(function() f:write(content) end)
+            pcall(function() f:close() end)
+            print("[OK]")
+        else
+            print("[ОШИБКА записи файла]")
+        end
     end
 end
 
+local stale = { "/home/me_snapshot.log", "/home/HostTime.tmp" }
+for _, p in ipairs(stale) do
+    pcall(function() if fs.exists(p) then fs.remove(p) end end)
+end
+
 print("\n==============================")
-print("Установка успешно завершена!")
-print("Запуск программы:")
-print("me_snapshot")
+print("Установка завершена!")
+print("Не забудь edit /home/config.lua → firebase_url, db_secret.")
+print("Запуск: me_snapshot")
 print("==============================")

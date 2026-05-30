@@ -49,9 +49,10 @@ local function getRealTime()
     local tmp = "/home/HostTime.tmp"
     local f = io.open(tmp, "w")
     if f then
-        f:write(""); f:close()
+        pcall(function() f:write("") end)
+        pcall(function() f:close() end)
         local lm = fs.lastModified(tmp)
-        fs.remove(tmp)
+        pcall(function() fs.remove(tmp) end)
         if lm and lm > 0 then return formatUnixTime(math.floor(lm / 1000) + tz * 3600) end
     end
     return os.date("%Y-%m-%d %H:%M:%S") .. " (игр)"
@@ -78,7 +79,12 @@ sendHeartbeat = function(stopped)
     do
         local tmp = "/home/HostTime.tmp"
         local f = io.open(tmp, "w")
-        if f then f:write(""); f:close(); lastSeenMs = fs.lastModified(tmp); fs.remove(tmp) end
+        if f then
+            pcall(function() f:write("") end)
+            pcall(function() f:close() end)
+            lastSeenMs = fs.lastModified(tmp)
+            pcall(function() fs.remove(tmp) end)
+        end
     end
     local ok, res = network.put("/heartbeats/me_snapshot", json.encode({
         name = "ME-Snapshot",
@@ -115,7 +121,9 @@ local function logToFile(msg)
 end
 
 -- На случай если на диске остался старый лог от прошлых версий — удаляем
+-- Удаляем осколки от прошлых версий программы
 pcall(function() if fs.exists("/home/me_snapshot.log") then fs.remove("/home/me_snapshot.log") end end)
+pcall(function() if fs.exists("/home/HostTime.tmp") then fs.remove("/home/HostTime.tmp") end end)
 
 -- =========================================================
 -- СНЯТИЕ SNAPSHOT'А
