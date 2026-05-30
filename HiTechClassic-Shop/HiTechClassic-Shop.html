@@ -8,6 +8,38 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* === Стили казино === */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #111827; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+        .glass-panel { background: rgba(31, 41, 55, 0.7); backdrop-filter: blur(10px); }
+        .player-link { cursor: pointer; transition: color 0.2s; }
+        .player-link:hover { color: #a855f7; text-decoration: underline; }
+        .pixelated { image-rendering: pixelated; }
+        .mc-slot {
+            background-color: #8b8b8b;
+            border: 2px solid;
+            border-top-color: #373737;
+            border-left-color: #373737;
+            border-bottom-color: #ffffff;
+            border-right-color: #ffffff;
+        }
+        .mc-slot:hover { background-color: #a0a0a0; }
+        .mc-tooltip-bg {
+            background-color: rgba(16, 0, 16, 0.95);
+            border: 2px solid #2a005c;
+            border-radius: 4px;
+            box-shadow: inset 0 0 0 1px #4b0082, 4px 4px 8px rgba(0,0,0,0.8);
+        }
+        .text-mc-shadow { text-shadow: 2px 2px 0px #222; }
+        @keyframes casinoFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .casino-fade-in { animation: casinoFadeIn 0.3s ease-out forwards; }
+        .casino-subtab-btn.active { background-color: #1f2937; color: #fff; }
+        /* старые правила сайта ниже */
+    </style>
     <style>
         .bg-gray-750 { background-color: #2d3441; }
         .hover\:bg-gray-750:hover { background-color: #2d3441; }
@@ -70,6 +102,7 @@
                             <button onclick="switchTab('shop')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-shop">Товары</button>
                             <button onclick="switchTab('nei')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-nei">NEI</button>
                             <button onclick="switchTab('crafter')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-crafter">Автокрафт</button>
+                            <button onclick="switchTab('casino')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-casino">Казино</button>
                             <button onclick="switchTab('logs')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-logs">Логи</button>
                         </div>
                     </div>
@@ -83,6 +116,7 @@
                     <button onclick="switchTab('shop')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-shop-mob">Товары</button>
                     <button onclick="switchTab('nei')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-nei-mob">NEI</button>
                     <button onclick="switchTab('crafter')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-crafter-mob">Автокрафт</button>
+                    <button onclick="switchTab('casino')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-casino-mob">Казино</button>
                     <button onclick="switchTab('logs')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-logs-mob">Логи</button>
                 </div>
             </div>
@@ -287,8 +321,210 @@
                 </div>
             </div>
 
+            <!-- ============================================================ -->
+            <!-- КАЗИНО                                                       -->
+            <!-- ============================================================ -->
+            <div id="content-casino" class="tab-content hidden">
+                <!-- Тултип каталога (плавающий) -->
+                <div id="casino-mc-tooltip" class="hidden fixed z-[9999] pointer-events-none mc-tooltip-bg p-3">
+                    <div id="casino-tt-name" class="text-[#55FF55] font-bold text-sm sm:text-base mb-2 text-mc-shadow tracking-wide"></div>
+                    <div class="flex flex-col gap-1">
+                        <div class="text-gray-400 text-[10px] sm:text-xs font-mono">ID: <span id="casino-tt-num" class="text-gray-200"></span></div>
+                        <div class="text-gray-400 text-[10px] sm:text-xs font-mono">Внутр: <span id="casino-tt-str" class="text-gray-200"></span></div>
+                    </div>
+                </div>
+
+                <!-- Sub-tabs Казино -->
+                <div class="mb-6 flex space-x-1 overflow-x-auto custom-scrollbar">
+                    <button onclick="casinoSwitchSubTab('analytics')" class="casino-subtab-btn active px-4 py-2 rounded-lg text-sm font-semibold text-gray-400 hover:text-white hover:bg-gray-800 transition" data-sub="analytics">📊 Аналитика</button>
+                    <button onclick="casinoSwitchSubTab('cases')"     class="casino-subtab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-400 hover:text-white hover:bg-gray-800 transition" data-sub="cases">📦 Кейсы</button>
+                    <button onclick="casinoSwitchSubTab('users')"     class="casino-subtab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-400 hover:text-white hover:bg-gray-800 transition" data-sub="users">👥 Игроки</button>
+                    <button onclick="casinoSwitchSubTab('logs')"      class="casino-subtab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-400 hover:text-white hover:bg-gray-800 transition" data-sub="logs">📜 Логи</button>
+                </div>
+
+                <!-- Аналитика -->
+                <div id="casino-sub-analytics" class="casino-sub-content casino-fade-in">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 gap-2">
+                        <div>
+                            <h2 class="text-2xl sm:text-3xl font-black text-white">Дашборд Казино</h2>
+                            <p class="text-xs sm:text-sm text-gray-400 mt-1">Детальная финансовая сводка на основе реальной истории открытий кейсов</p>
+                        </div>
+                    </div>
+                    <div id="casino-analytics-hero" class="w-full p-5 sm:p-8 rounded-2xl mb-6 sm:mb-8 relative overflow-hidden flex items-center justify-between border transition-all duration-500 bg-gray-800">
+                        <div class="absolute inset-0 bg-gradient-to-r from-transparent to-black/30 pointer-events-none"></div>
+                        <div class="relative z-10">
+                            <h3 class="text-xs sm:text-sm font-bold tracking-widest uppercase mb-1 sm:mb-2 opacity-80" id="casino-hero-subtitle">Фактическая чистая прибыль</h3>
+                            <div class="text-4xl sm:text-5xl md:text-7xl font-black drop-shadow-md tracking-tight break-all" id="casino-hero-title">—</div>
+                        </div>
+                        <div class="relative z-10 text-6xl sm:text-8xl md:text-9xl opacity-20 drop-shadow-2xl absolute right-4">📈</div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5 mb-8">
+                        <div class="bg-gray-800 rounded-xl p-4 sm:p-5 border border-gray-700 shadow-md"><div class="text-gray-400 text-[10px] sm:text-xs font-bold uppercase mb-1">Суммарный оборот</div><div class="text-xl sm:text-2xl font-black text-white truncate" id="casino-stat-spent">0 ЭМ</div></div>
+                        <div class="bg-gray-800 rounded-xl p-4 sm:p-5 border border-gray-700 shadow-md"><div class="text-gray-400 text-[10px] sm:text-xs font-bold uppercase mb-1">Выдано призами</div><div class="text-xl sm:text-2xl font-black text-blue-400 truncate" id="casino-stat-given">0 ЭМ</div></div>
+                        <div class="bg-gray-800 rounded-xl p-4 sm:p-5 border border-gray-700 shadow-md"><div class="text-gray-400 text-[10px] sm:text-xs font-bold uppercase mb-1">Внесено игроками</div><div class="text-xl sm:text-2xl font-black text-green-400 truncate" id="casino-stat-deposited">0 ЭМ</div></div>
+                        <div class="bg-gray-800 rounded-xl p-4 sm:p-5 border border-gray-700 shadow-md"><div class="text-gray-400 text-[10px] sm:text-xs font-bold uppercase mb-1">Обязательства</div><div class="text-xl sm:text-2xl font-black text-yellow-400 truncate" id="casino-stat-balances">0 ЭМ</div></div>
+                        <div class="bg-gray-800 rounded-xl p-4 sm:p-5 border border-gray-700 shadow-md"><div class="text-gray-400 text-[10px] sm:text-xs font-bold uppercase mb-1">Всего игроков</div><div class="text-xl sm:text-2xl font-black text-white truncate" id="casino-stat-users">0</div></div>
+                        <div class="bg-gray-800 rounded-xl p-4 sm:p-5 border border-gray-700 shadow-md"><div class="text-gray-400 text-[10px] sm:text-xs font-bold uppercase mb-1">Фактическая отдача (RTP)</div><div class="text-xl sm:text-2xl font-black text-purple-400 truncate" id="casino-stat-rtp">0%</div></div>
+                    </div>
+                    <div class="bg-gray-800 rounded-xl p-4 sm:p-6 border border-gray-700 shadow-md">
+                        <h3 class="text-base sm:text-lg font-bold mb-4 text-white">Топ-10 игроков по тратам</h3>
+                        <div class="h-48 sm:h-64 w-full"><canvas id="casino-topSpendersChart"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- Игроки -->
+                <div id="casino-sub-users" class="casino-sub-content casino-fade-in hidden">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                        <h2 class="text-2xl sm:text-3xl font-black text-white">База игроков</h2>
+                        <button onclick="casinoOpenAddUserModal()" class="w-full sm:w-auto bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5 px-5 rounded-lg shadow transition flex items-center justify-center gap-2"><span>+ Добавить игрока</span></button>
+                    </div>
+                    <div class="bg-gray-800 shadow-xl rounded-xl border border-gray-700 overflow-hidden">
+                        <div class="overflow-x-auto custom-scrollbar">
+                            <table class="w-full text-left min-w-[700px]">
+                                <thead class="bg-gray-900 border-b border-gray-700">
+                                    <tr>
+                                        <th class="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase whitespace-nowrap">Никнейм</th>
+                                        <th class="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase whitespace-nowrap">Потрачено всего</th>
+                                        <th class="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase whitespace-nowrap">Текущий баланс (ЭМ)</th>
+                                        <th class="px-4 sm:px-6 py-4 text-[10px] sm:text-xs font-bold text-gray-400 uppercase text-right whitespace-nowrap">Действия</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="casino-users-list" class="divide-y divide-gray-700"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Кейсы -->
+                <div id="casino-sub-cases" class="casino-sub-content casino-fade-in hidden">
+                    <div id="casino-cases-grid-view">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                            <h2 class="text-2xl sm:text-3xl font-black text-white">Управление кейсами</h2>
+                            <button onclick="casinoCreateNewCase()" class="w-full sm:w-auto bg-green-600 hover:bg-green-500 text-white font-bold py-2.5 px-5 rounded-lg shadow transition"><span>+ Создать кейс</span></button>
+                        </div>
+                        <div id="casino-cases-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"></div>
+                    </div>
+                    <div id="casino-case-editor-view" class="hidden">
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
+                            <button onclick="casinoCloseCaseEditor()" class="w-full sm:w-auto bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-2.5 px-4 rounded-lg shadow border border-gray-600 transition">← Назад к списку</button>
+                            <h2 class="text-xl sm:text-2xl font-black text-white">Редактор кейса</h2>
+                        </div>
+                        <div id="casino-case-editor-container"></div>
+                    </div>
+                </div>
+
+                <!-- Логи казино -->
+                <div id="casino-sub-logs" class="casino-sub-content casino-fade-in hidden">
+                    <h2 class="text-2xl sm:text-3xl font-black mb-6 text-white">Журнал транзакций казино</h2>
+                    <div class="bg-gray-800 shadow-xl rounded-xl border border-gray-700 overflow-hidden">
+                        <div class="overflow-x-auto max-h-[70vh] sm:max-h-[80vh] custom-scrollbar">
+                            <table class="w-full text-left border-collapse min-w-[700px]">
+                                <thead class="bg-gray-900 border-b border-gray-700 sticky top-0 z-10 shadow-sm">
+                                    <tr>
+                                        <th class="px-4 py-3 text-[10px] sm:text-xs font-bold text-gray-500 uppercase">Время</th>
+                                        <th class="px-4 py-3 text-[10px] sm:text-xs font-bold text-gray-500 uppercase">Игрок</th>
+                                        <th class="px-4 py-3 text-[10px] sm:text-xs font-bold text-gray-500 uppercase">Действие</th>
+                                        <th class="px-4 py-3 text-[10px] sm:text-xs font-bold text-gray-500 uppercase">Подробности</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="casino-logs-list" class="divide-y divide-gray-800/50 text-xs sm:text-sm"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Модалки казино -->
+                <div id="casino-add-user-modal" class="hidden fixed inset-0 bg-black/80 z-[100] flex items-center justify-center backdrop-blur-sm p-4">
+                    <div class="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+                        <div class="bg-gray-800 px-4 sm:px-6 py-4 border-b border-gray-700 flex justify-between items-center">
+                            <h3 class="text-lg font-bold text-white">Новый игрок казино</h3>
+                            <button onclick="casinoCloseAddUserModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
+                        </div>
+                        <div class="p-4 sm:p-6 space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Никнейм в игре</label>
+                                <input type="text" id="casino-new-user-name" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:border-purple-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Начальный баланс (ЭМ)</label>
+                                <input type="number" id="casino-new-user-bal" value="0" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-yellow-400 font-mono focus:border-yellow-500 outline-none">
+                            </div>
+                            <button onclick="casinoConfirmAddUser()" class="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 text-white font-bold py-3 rounded-lg mt-2 shadow-lg">Добавить</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="casino-player-stats-modal" class="hidden fixed inset-0 bg-black/80 z-[100] flex items-center justify-center backdrop-blur-sm p-4">
+                    <div class="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+                        <div class="bg-gray-800 px-4 sm:px-6 py-4 border-b border-gray-700 flex justify-between items-start sm:items-center flex-col sm:flex-row gap-2">
+                            <h3 class="text-lg sm:text-xl font-bold text-white flex items-center gap-2 flex-wrap">
+                                <span>Статистика игрока:</span> <span id="casino-stats-player-name" class="text-purple-400 break-all"></span>
+                            </h3>
+                            <button onclick="casinoClosePlayerStatsModal()" class="text-gray-400 hover:text-white text-2xl font-bold self-end sm:self-auto -mt-8 sm:mt-0">✕</button>
+                        </div>
+                        <div class="p-4 sm:p-6 overflow-y-auto custom-scrollbar">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                                <div class="bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-700"><div class="text-[10px] sm:text-xs text-gray-400 uppercase font-bold mb-1">Текущий баланс</div><div id="casino-stats-balance" class="text-lg sm:text-xl font-black text-yellow-400 truncate">0 ЭМ</div></div>
+                                <div class="bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-700"><div class="text-[10px] sm:text-xs text-gray-400 uppercase font-bold mb-1">Потрачено (Всего)</div><div id="casino-stats-spent-total" class="text-lg sm:text-xl font-black text-white truncate">0 ЭМ</div></div>
+                                <div class="bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-700"><div class="text-[10px] sm:text-xs text-gray-400 uppercase font-bold mb-1">Потрачено (Логи)</div><div id="casino-stats-spent-logs" class="text-lg sm:text-xl font-black text-gray-300 truncate">0 ЭМ</div></div>
+                                <div class="bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-700"><div class="text-[10px] sm:text-xs text-gray-400 uppercase font-bold mb-1">Выиграно (Логи)</div><div id="casino-stats-won" class="text-lg sm:text-xl font-black text-green-400 truncate">0 ЭМ</div></div>
+                                <div class="bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-700"><div class="text-[10px] sm:text-xs text-gray-400 uppercase font-bold mb-1">Профит (Логи)</div><div id="casino-stats-profit" class="text-lg sm:text-xl font-black truncate">0 ЭМ</div></div>
+                                <div class="bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-700"><div class="text-[10px] sm:text-xs text-gray-400 uppercase font-bold mb-1">Сумма пополнений</div><div id="casino-stats-deposited" class="text-lg sm:text-xl font-black text-blue-400 truncate">0 ЭМ</div></div>
+                                <div class="bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-700"><div class="text-[10px] sm:text-xs text-gray-400 uppercase font-bold mb-1">Открыто кейсов</div><div id="casino-stats-cases-opened" class="text-lg sm:text-xl font-black text-white truncate">0 шт.</div></div>
+                                <div class="bg-gray-800 p-3 sm:p-4 rounded-xl border border-gray-700 col-span-1 sm:col-span-2 md:col-span-1"><div class="text-[10px] sm:text-xs text-gray-400 uppercase font-bold mb-1">Лучший выигрыш</div><div id="casino-stats-best-win" class="text-xs sm:text-sm font-bold text-purple-400 break-words">Нет данных</div></div>
+                            </div>
+                            <h4 class="text-base sm:text-lg font-bold text-white mb-3 border-b border-gray-700 pb-2">История действий (до 100 последних)</h4>
+                            <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-x-auto custom-scrollbar">
+                                <table class="w-full text-left text-xs sm:text-sm min-w-[500px]">
+                                    <tbody id="casino-stats-history-list" class="divide-y divide-gray-700/50"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Каталог предметов для кейсов -->
+                <div id="casino-catalog-modal" class="hidden fixed inset-0 bg-black/90 z-[200] flex flex-col backdrop-blur-md">
+                    <div class="p-4 sm:p-6 bg-gray-900 border-b border-gray-800 flex flex-row justify-between items-center shadow-xl z-10 gap-2">
+                        <div>
+                            <h2 class="text-xl sm:text-2xl font-black text-white flex items-center gap-2 flex-wrap">📖 Каталог<span id="casino-catalog-count" class="text-xs sm:text-sm font-normal text-gray-400 bg-gray-800 px-2 sm:px-3 py-1 rounded-full">—</span></h2>
+                            <p class="text-gray-400 text-xs sm:text-sm mt-1 hidden sm:block">Выберите предмет для автозаполнения</p>
+                        </div>
+                        <button onclick="casinoCloseCatalog()" class="text-gray-400 hover:text-white text-2xl sm:text-3xl font-bold bg-gray-800 hover:bg-gray-700 w-10 h-10 sm:w-12 sm:h-12 rounded-xl transition flex items-center justify-center shrink-0">✕</button>
+                    </div>
+                    <div class="p-4 sm:p-6 bg-gray-900 border-b border-gray-800 flex flex-col sm:flex-row gap-3 sm:gap-4 z-10">
+                        <div class="flex-1 relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">🔍</div>
+                            <input type="text" id="casino-cat-search" placeholder="Поиск (имя, ID)..." class="w-full bg-gray-800 border border-gray-700 text-white rounded-xl pl-10 sm:pl-12 pr-4 py-2.5 sm:py-3 focus:border-blue-500 outline-none">
+                        </div>
+                        <div class="w-full sm:w-64 shrink-0">
+                            <select id="casino-cat-mod" class="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 sm:py-3 focus:border-blue-500 outline-none appearance-none cursor-pointer">
+                                <option value="ALL">Все моды</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-2 sm:p-6 custom-scrollbar relative">
+                        <div id="casino-cat-grid" class="flex flex-wrap gap-1 content-start justify-center sm:justify-start max-w-[1200px] mx-auto pb-8"></div>
+                        <div id="casino-cat-empty" class="hidden absolute inset-0 flex items-center justify-center text-gray-500 text-base sm:text-lg font-bold text-center px-4">По запросу ничего не найдено</div>
+                    </div>
+                </div>
+            </div>
+
             <div id="content-logs" class="tab-content hidden">
-                <h2 class="text-2xl font-bold mb-4">История операций</h2>
+                <div class="flex items-center justify-between mb-4 gap-4 flex-wrap">
+                    <h2 class="text-2xl font-bold">История операций</h2>
+                    <div id="logs-stats" class="text-sm text-gray-400">—</div>
+                </div>
+
+                <div class="bg-gray-800 shadow rounded-lg border border-gray-700 mb-4 p-3 flex flex-wrap gap-2">
+                    <button data-logcat="all"       class="logs-filter-btn px-3 py-1.5 rounded text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition">Все</button>
+                    <button data-logcat="shop"      class="logs-filter-btn px-3 py-1.5 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 text-gray-200 transition">🏪 Магазин</button>
+                    <button data-logcat="autocraft" class="logs-filter-btn px-3 py-1.5 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 text-gray-200 transition">⚙ Автокрафт</button>
+                    <button data-logcat="casino"    class="logs-filter-btn px-3 py-1.5 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 text-gray-200 transition">🎰 Казино</button>
+                    <button data-logcat="admin"     class="logs-filter-btn px-3 py-1.5 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 text-gray-200 transition">👤 Админка</button>
+                    <input id="logs-search" type="text" placeholder="поиск по тексту…" class="flex-1 min-w-[160px] bg-gray-700 text-white px-3 py-1.5 rounded border border-gray-600 focus:outline-none focus:border-blue-500 text-xs">
+                </div>
+
                 <div class="bg-gray-800 shadow rounded-lg overflow-hidden border border-gray-700">
                     <div id="logs-list" class="divide-y divide-gray-700"></div>
                 </div>
@@ -347,6 +583,7 @@
                 document.getElementById('tab-' + tabId + '-mob').classList.add('bg-gray-900', 'text-white');
             }
             if (tabId === 'nei') neiInitOnce();
+            if (tabId === 'casino') casinoInit();
         }
 
         function loadData() {
@@ -459,38 +696,155 @@
             // и обновляем «свежесть» статуса каждые 5 сек (показываем offline если давно нет апдейтов)
             setInterval(renderCrafterStatus, 5000);
 
-            // ЛОГИ
-            db.ref('logs').orderByKey().limitToLast(100).on('value', (snapshot) => {
-                const logsRaw = snapshot.val() || {};
-                const list = document.getElementById('logs-list');
-                list.innerHTML = '';
-                const logsArray = [];
-                for (const key in logsRaw) {
-                    let log = logsRaw[key];
-                    if (typeof log === 'string') { try { log = JSON.parse(log); } catch(e) { continue; } }
-                    logsArray.push(log);
-                }
-                logsArray.reverse(); 
-                logsArray.forEach(log => {
-                    let actionColor = "text-gray-300";
-                    if(log.action.includes("ПОКУПКА")) actionColor = "text-green-400";
-                    if(log.action.includes("ПРОДАЖА") || log.action.includes("СКУПКА")) actionColor = "text-yellow-400";
-                    if(log.action.includes("УДАЛЕН") || log.action.includes("ОШИБКА")) actionColor = "text-red-400";
+            // ЛОГИ (объединение /logs и /casino/logs с категориями)
+            window.LOGS_STATE = window.LOGS_STATE || {
+                shared: [], casino: [], filter: 'all', search: '', bound: false
+            };
 
-                    list.innerHTML += `
-                        <div class="p-4 hover:bg-gray-750 transition flex flex-col gap-1">
-                            <div class="flex flex-wrap justify-between items-center gap-x-4 gap-y-1 border-b border-gray-700 pb-2 sm:border-0 sm:pb-0">
-                                <div class="flex items-center gap-2">
-                                    <span class="font-bold text-base text-white">${log.user}</span>
-                                    <span class="text-sm font-bold bg-gray-900 px-2 py-0.5 rounded ${actionColor}">${log.action}</span>
-                                </div>
-                                <span class="text-xs font-mono text-gray-400">${log.time}</span>
-                            </div>
-                            <div class="text-sm text-gray-300 break-words mt-1">${log.details}</div>
-                        </div>
-                    `;
-                });
+            db.ref('logs').orderByKey().limitToLast(200).on('value', (snapshot) => {
+                const raw = snapshot.val() || {};
+                const arr = [];
+                for (const key in raw) {
+                    let log = raw[key];
+                    if (typeof log === 'string') { try { log = JSON.parse(log); } catch(e){ continue; } }
+                    arr.push(Object.assign({}, log, { _source: 'shared' }));
+                }
+                window.LOGS_STATE.shared = arr;
+                renderUnifiedLogs();
             });
+
+            db.ref('casino/logs').orderByKey().limitToLast(200).on('value', (snapshot) => {
+                const raw = snapshot.val() || {};
+                const arr = [];
+                for (const key in raw) {
+                    let log = raw[key];
+                    if (typeof log === 'string') { try { log = JSON.parse(log); } catch(e){ continue; } }
+                    arr.push(Object.assign({}, log, { _source: 'casino' }));
+                }
+                window.LOGS_STATE.casino = arr;
+                renderUnifiedLogs();
+            });
+
+            // биндим фильтры (один раз)
+            if (!window.LOGS_STATE.bound) {
+                document.querySelectorAll('.logs-filter-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        window.LOGS_STATE.filter = btn.dataset.logcat;
+                        document.querySelectorAll('.logs-filter-btn').forEach(b => {
+                            b.classList.remove('bg-blue-600', 'hover:bg-blue-700', 'text-white');
+                            b.classList.add('bg-gray-700', 'hover:bg-gray-600', 'text-gray-200');
+                        });
+                        btn.classList.remove('bg-gray-700', 'hover:bg-gray-600', 'text-gray-200');
+                        btn.classList.add('bg-blue-600', 'hover:bg-blue-700', 'text-white');
+                        renderUnifiedLogs();
+                    });
+                });
+                let to;
+                document.getElementById('logs-search').addEventListener('input', (e) => {
+                    clearTimeout(to);
+                    to = setTimeout(() => {
+                        window.LOGS_STATE.search = e.target.value.trim().toLowerCase();
+                        renderUnifiedLogs();
+                    }, 120);
+                });
+                window.LOGS_STATE.bound = true;
+            }
+        }
+
+        // Определение категории лога по содержимому
+        function logCategory(log) {
+            if (log._source === 'casino') return 'casino';
+            const user = String(log.user || '').toLowerCase();
+            const action = String(log.action || '').toUpperCase();
+            if (user === 'crafter' || action.includes('АВТОКРАФТ') || action === 'ЗАКАЗАН'
+                || action === 'ТИК' || action === 'СТАРТ' || action === 'СТОП'
+                || action.includes('STATUS_') || action.includes('FATAL_TICK')
+                || action.includes('FILL_SLOTS') || action.includes('PROGRESS')
+                || action.includes('CRASH') || action.includes('ЗАВЕРШЁН')
+                || action === 'ПРОВАЛ' || action === 'ОТМЕНЁН' || action === 'ОТМЕНА'
+                || action === 'СОБЫТИЕ' || action === 'СТАТУС' || action === 'ИНФО'
+                || (action === 'ОШИБКА' && /(me_interface|firebase|crafter|shop\/items|crafter_url)/i.test(String(log.details||'')))) {
+                return 'autocraft';
+            }
+            // действия через сайт-админку идут от залогиненного админа
+            if (action.includes('ТОВАР') || action === 'КАТЕГОРИЯ СОЗДАНА') return 'admin';
+            return 'shop';
+        }
+
+        function renderUnifiedLogs() {
+            const all = window.LOGS_STATE.shared.concat(window.LOGS_STATE.casino);
+            const filter = window.LOGS_STATE.filter || 'all';
+            const search = window.LOGS_STATE.search || '';
+
+            const filtered = all.filter(log => {
+                const cat = logCategory(log);
+                if (filter !== 'all' && cat !== filter) return false;
+                if (search) {
+                    const blob = (String(log.user||'') + ' ' + String(log.action||'') + ' ' + String(log.details||'')).toLowerCase();
+                    if (!blob.includes(search)) return false;
+                }
+                return true;
+            });
+
+            // сортировка по времени (ISO/DD.MM.YYYY HH:MM:SS — оба формата)
+            filtered.sort((a, b) => parseLogTime(b.time) - parseLogTime(a.time));
+
+            // ограничение
+            const view = filtered.slice(0, 300);
+
+            document.getElementById('logs-stats').textContent =
+                view.length + ' / ' + all.length + ' записей' + (filter !== 'all' ? ' (фильтр: ' + filter + ')' : '');
+
+            const list = document.getElementById('logs-list');
+            if (!view.length) {
+                list.innerHTML = '<div class="p-6 text-center text-gray-500 text-sm">Записей не найдено</div>';
+                return;
+            }
+            const out = [];
+            for (const log of view) {
+                const cat = logCategory(log);
+                const action = String(log.action || '');
+                let actionColor = 'text-gray-300';
+                if (action.includes('ПОКУПКА') || action.includes('ВЫИГРЫШ') || action.includes('ЗАВЕРШЁН') || action.includes('ДОБАВЛЕН')) actionColor = 'text-green-400';
+                else if (action.includes('ПРОДАЖА') || action.includes('СКУПКА') || action.includes('ПОПОЛНЕНИЕ') || action === 'ТИК') actionColor = 'text-yellow-400';
+                else if (action.includes('УДАЛ') || action.includes('ОШИБКА') || action.includes('ПРОВАЛ') || action.includes('CRASH') || action.includes('FATAL')) actionColor = 'text-red-400';
+                else if (action.includes('ЗАКАЗАН') || action.includes('СТАРТ')) actionColor = 'text-blue-400';
+
+                const catBadge = ({
+                    casino:    '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-900/40 text-purple-300 border border-purple-700/50">🎰 Казино</span>',
+                    autocraft: '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-300 border border-blue-700/50">⚙ Автокрафт</span>',
+                    admin:     '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-300 border border-amber-700/50">👤 Админка</span>',
+                    shop:      '<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-900/40 text-green-300 border border-green-700/50">🏪 Магазин</span>',
+                })[cat] || '';
+
+                out.push(
+                    '<div class="p-4 hover:bg-gray-750 transition flex flex-col gap-1">'
+                  + '  <div class="flex flex-wrap justify-between items-center gap-x-4 gap-y-1">'
+                  + '    <div class="flex items-center gap-2 flex-wrap">'
+                  + '      ' + catBadge
+                  + '      <span class="font-bold text-base text-white">' + neiEsc(log.user || '—') + '</span>'
+                  + '      <span class="text-sm font-bold bg-gray-900 px-2 py-0.5 rounded ' + actionColor + '">' + neiEsc(action) + '</span>'
+                  + '    </div>'
+                  + '    <span class="text-xs font-mono text-gray-400">' + neiEsc(String(log.time || '').replace(/\[|\]/g, '')) + '</span>'
+                  + '  </div>'
+                  + '  <div class="text-sm text-gray-300 break-words mt-1">' + neiEsc(log.details || '') + '</div>'
+                  + '</div>'
+                );
+            }
+            list.innerHTML = out.join('');
+        }
+
+        function parseLogTime(t) {
+            if (!t) return 0;
+            const s = String(t).replace(/\[|\]/g, '').trim();
+            // ISO YYYY-MM-DD HH:MM:SS
+            let m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+            if (m) return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]).getTime();
+            // DD.MM.YYYY HH:MM:SS
+            m = s.match(/^(\d{2})\.(\d{2})\.(\d{4}) (\d{2}):(\d{2}):(\d{2})/);
+            if (m) return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]).getTime();
+            // fallback на Date.parse
+            const p = Date.parse(s); return isNaN(p) ? 0 : p;
         }
 
         window.saveBalance = function(name) {
@@ -1494,6 +1848,655 @@
         }
         function neiEscAttr(s) { return neiEsc(s); }
         function neiFmt(n) { return Number(n).toLocaleString('ru'); }
+
+        // =====================================================================
+        // КАЗИНО — встроенная админка (адаптация casino_index.html)
+        // Использует /casino/users, /casino/data/cases, /casino/logs в Firebase.
+        // Каталог предметов берёт из window.NEI.all (тот же что в NEI вкладке).
+        // =====================================================================
+        const CASINO_DB_PATH = 'casino';
+        window.CASINO = {
+            users: {},
+            cases: [],
+            logs: [],
+            editingIdx: null,
+            chart: null,
+            initialized: false,
+            catalogTargetItemIdx: null,
+        };
+
+        function casinoInit() {
+            if (window.CASINO.initialized) return;
+            window.CASINO.initialized = true;
+
+            // Подписываемся на данные казино
+            db.ref(CASINO_DB_PATH + '/users').on('value', (snap) => {
+                window.CASINO.users = snap.val() || {};
+                casinoRenderUsers(); casinoUpdateAnalytics();
+            });
+            db.ref(CASINO_DB_PATH + '/data/cases').on('value', (snap) => {
+                window.CASINO.cases = snap.val() || [];
+                if (window.CASINO.editingIdx === null) casinoRenderCasesGrid();
+                casinoUpdateAnalytics();
+            });
+            db.ref(CASINO_DB_PATH + '/logs').on('value', (snap) => {
+                const raw = snap.val() || {};
+                const arr = [];
+                for (const k in raw) arr.push(raw[k]);
+                arr.sort((a, b) => new Date(String(b.time||'').replace(/\[|\]/g, '')) - new Date(String(a.time||'').replace(/\[|\]/g, '')));
+                window.CASINO.logs = arr;
+                casinoRenderLogs(); casinoUpdateAnalytics();
+            });
+
+            // Заполняем модов для фильтра каталога (из NEI данных, если загружены)
+            casinoFillCatalogModFilter();
+            document.getElementById('casino-cat-search').addEventListener('input', casinoRenderCatalogItems);
+            document.getElementById('casino-cat-mod').addEventListener('change', casinoRenderCatalogItems);
+        }
+
+        function casinoSwitchSubTab(sub) {
+            document.querySelectorAll('.casino-sub-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.casino-subtab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById('casino-sub-' + sub).classList.remove('hidden');
+            const btn = document.querySelector('.casino-subtab-btn[data-sub="' + sub + '"]');
+            if (btn) btn.classList.add('active');
+            if (sub === 'cases') {
+                if (window.CASINO.editingIdx === null) casinoRenderCasesGrid();
+                else casinoRenderCaseEditor(window.CASINO.editingIdx);
+            } else if (sub === 'analytics') {
+                casinoUpdateAnalytics();
+            }
+        }
+
+        // ===== Каталог: используем window.NEI.all =====
+        function casinoFillCatalogModFilter() {
+            const sel = document.getElementById('casino-cat-mod');
+            const arr = (window.NEI && window.NEI.all) ? window.NEI.all : [];
+            if (!arr.length) {
+                document.getElementById('casino-catalog-count').textContent = 'Открой NEI для загрузки каталога';
+                return;
+            }
+            const mods = new Set();
+            for (const x of arr) if (x.mod_id) mods.add(x.mod_id);
+            sel.innerHTML = '<option value="ALL">Все моды</option>';
+            Array.from(mods).sort().forEach(m => {
+                const o = document.createElement('option'); o.value = m; o.textContent = m; sel.appendChild(o);
+            });
+            document.getElementById('casino-catalog-count').textContent = arr.length + ' шт.';
+        }
+
+        function casinoGetIconUrl(stringId, dmg) {
+            dmg = Number(dmg) || 0;
+            const arr = (window.NEI && window.NEI.all) ? window.NEI.all : [];
+            const found = arr.find(x => x.id === stringId && (Number(x.metadata) || 0) === dmg);
+            if (found && found.icon) return './item_icons/' + found.icon;
+            return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='none' stroke='%234b5563' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'%3E%3C/circle%3E%3Cpolyline points='21 15 16 10 5 21'%3E%3C/polyline%3E%3C/svg%3E";
+        }
+
+        window.casinoUpdateIconPreview = function(i) {
+            const id = document.getElementById('ed-id-' + i).value;
+            const dmg = document.getElementById('ed-damage-' + i).value;
+            document.getElementById('icon-preview-' + i).src = casinoGetIconUrl(id, dmg);
+            const nameField = document.getElementById('ed-name-' + i);
+            if (nameField.value.trim() === '' || nameField.value === 'Новый предмет') {
+                const arr = (window.NEI && window.NEI.all) ? window.NEI.all : [];
+                const found = arr.find(x => x.id === id && (Number(x.metadata) || 0) === Number(dmg));
+                if (found && found.name) nameField.value = found.name;
+            }
+        };
+
+        // ===== Тултип =====
+        function casinoShowTooltip(e, name, numId, dmg, strId) {
+            const tt = document.getElementById('casino-mc-tooltip');
+            document.getElementById('casino-tt-name').textContent = name;
+            const numDisp = (numId && numId !== 'undefined' && numId !== '?') ? numId : 'Unknown';
+            document.getElementById('casino-tt-num').textContent = numDisp + ':' + dmg;
+            document.getElementById('casino-tt-str').textContent = strId + ':' + dmg;
+            tt.classList.remove('hidden');
+            casinoPositionTooltip(e);
+        }
+        function casinoHideTooltip() { document.getElementById('casino-mc-tooltip').classList.add('hidden'); }
+        function casinoPositionTooltip(e) {
+            const tt = document.getElementById('casino-mc-tooltip');
+            if (tt.classList.contains('hidden')) return;
+            let x = e.clientX + 15, y = e.clientY + 15;
+            if (x + tt.offsetWidth > window.innerWidth) x = e.clientX - tt.offsetWidth - 10;
+            if (y + tt.offsetHeight > window.innerHeight) y = e.clientY - tt.offsetHeight - 10;
+            tt.style.left = x + 'px'; tt.style.top = y + 'px';
+        }
+        window.casinoShowTooltip = casinoShowTooltip;
+        window.casinoHideTooltip = casinoHideTooltip;
+        window.casinoPositionTooltip = casinoPositionTooltip;
+
+        // ===== Каталог: открытие/закрытие =====
+        window.casinoOpenCatalog = function(itemIdx) {
+            window.CASINO.catalogTargetItemIdx = itemIdx;
+            casinoFillCatalogModFilter();
+            document.getElementById('casino-catalog-modal').classList.remove('hidden');
+            casinoRenderCatalogItems();
+            document.getElementById('casino-cat-search').focus();
+        };
+        window.casinoCloseCatalog = function() {
+            document.getElementById('casino-catalog-modal').classList.add('hidden');
+            document.getElementById('casino-cat-search').value = '';
+            casinoHideTooltip();
+        };
+
+        function casinoRenderCatalogItems() {
+            const search = document.getElementById('casino-cat-search').value.toLowerCase();
+            const mod = document.getElementById('casino-cat-mod').value;
+            const grid = document.getElementById('casino-cat-grid');
+            const empty = document.getElementById('casino-cat-empty');
+            grid.innerHTML = '';
+            const arr = (window.NEI && window.NEI.all) ? window.NEI.all : [];
+            const filtered = arr.filter(it => {
+                if (mod !== 'ALL' && it.mod_id !== mod) return false;
+                if (search) {
+                    return (it.name && it.name.toLowerCase().includes(search))
+                        || (it.id && it.id.toLowerCase().includes(search));
+                }
+                return true;
+            });
+            if (filtered.length === 0) { empty.classList.remove('hidden'); return; }
+            empty.classList.add('hidden');
+            filtered.slice(0, 300).forEach(it => {
+                const imgUrl = it.icon ? ('./item_icons/' + it.icon) : casinoGetIconUrl(it.id, it.metadata);
+                const safeName = (it.name || 'Неизвестно').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const numId = it.numeric_id ?? '?';
+                const dmg = it.metadata ?? 0;
+                grid.innerHTML +=
+                    '<div class="w-[52px] h-[52px] sm:w-[60px] sm:h-[60px] mc-slot cursor-pointer flex items-center justify-center p-1"'
+                    + ' onclick="casinoSelectCatalogItem(\'' + it.id + '\', ' + dmg + ', \'' + safeName + '\')"'
+                    + ' onmouseenter="casinoShowTooltip(event, \'' + safeName + '\', \'' + numId + '\', ' + dmg + ', \'' + it.id + '\')"'
+                    + ' onmouseleave="casinoHideTooltip()"'
+                    + ' onmousemove="casinoPositionTooltip(event)">'
+                    + '<img src="' + imgUrl + '" loading="lazy" class="max-w-full max-h-full object-contain pixelated" onerror="this.src=\'' + casinoGetIconUrl('none',0) + '\'">'
+                    + '</div>';
+            });
+            if (filtered.length > 300) {
+                grid.innerHTML += '<div class="w-full text-center text-gray-500 py-4 font-bold mt-4">Показано 300 из ' + filtered.length + '. Уточните поиском.</div>';
+            }
+        }
+        window.casinoSelectCatalogItem = function(id, dmg, name) {
+            if (window.CASINO.catalogTargetItemIdx === null) {
+                const c = window.CASINO.cases[window.CASINO.editingIdx];
+                if (!c.items) c.items = [];
+                c.items.push({ name: name, id: id, damage: dmg, price: 10, chance: 10, qty: 1 });
+                casinoRenderCaseEditor(window.CASINO.editingIdx);
+            } else {
+                const i = window.CASINO.catalogTargetItemIdx;
+                document.getElementById('ed-name-' + i).value = name;
+                document.getElementById('ed-id-' + i).value = id;
+                document.getElementById('ed-damage-' + i).value = dmg;
+                casinoUpdateIconPreview(i);
+            }
+            casinoCloseCatalog();
+        };
+
+        // ===== Аналитика =====
+        function casinoUpdateAnalytics() {
+            let totalSpent = 0, totalBalances = 0;
+            const topSpenders = [];
+            for (const [name, raw] of Object.entries(window.CASINO.users)) {
+                let d = raw;
+                if (typeof raw === 'string') { try { d = JSON.parse(raw); } catch(e){ d = {balance:0,spent:0}; } }
+                totalSpent += (d.spent || 0); totalBalances += (d.balance || 0);
+                topSpenders.push({ name: name, spent: d.spent || 0 });
+            }
+            let exactGiven = 0;
+            window.CASINO.logs.forEach(log => {
+                if (log.action === 'ВЫИГРЫШ' && log.details) {
+                    const m = log.details.match(/Выиграл (.*) \(x(\d+)\) из кейса (.*)/);
+                    if (m) {
+                        const itemName = m[1], qty = Number(m[2]), caseName = m[3];
+                        let p = 0;
+                        const c = window.CASINO.cases.find(c => c && c.name === caseName);
+                        if (c && c.items) {
+                            let f = c.items.find(it => it.name === itemName && Number(it.qty) === qty);
+                            if (!f) f = c.items.find(it => it.name === itemName);
+                            if (f) p = Number(f.price) || 0;
+                        }
+                        if (p === 0) {
+                            for (const fc of window.CASINO.cases) {
+                                if (fc && fc.items) {
+                                    let f = fc.items.find(it => it.name === itemName && Number(it.qty) === qty);
+                                    if (!f) f = fc.items.find(it => it.name === itemName);
+                                    if (f) { p = Number(f.price) || 0; break; }
+                                }
+                            }
+                        }
+                        exactGiven += p;
+                    }
+                }
+            });
+            const profit = totalSpent - exactGiven;
+            const deposited = totalSpent + totalBalances;
+            const rtp = totalSpent > 0 ? (exactGiven / totalSpent) * 100 : 0;
+            document.getElementById('casino-stat-spent').textContent = totalSpent.toFixed(0) + ' ЭМ';
+            document.getElementById('casino-stat-given').textContent = exactGiven.toFixed(0) + ' ЭМ';
+            document.getElementById('casino-stat-balances').textContent = totalBalances.toFixed(0) + ' ЭМ';
+            document.getElementById('casino-stat-deposited').textContent = deposited.toFixed(0) + ' ЭМ';
+            document.getElementById('casino-stat-users').textContent = Object.keys(window.CASINO.users).length;
+            document.getElementById('casino-stat-rtp').textContent = rtp.toFixed(1) + '%';
+            const heroBox = document.getElementById('casino-analytics-hero');
+            const heroTitle = document.getElementById('casino-hero-title');
+            const heroSub = document.getElementById('casino-hero-subtitle');
+            heroBox.classList.remove('bg-green-600', 'bg-red-600', 'bg-gray-800');
+            if (totalSpent === 0) {
+                heroBox.classList.add('bg-gray-800'); heroTitle.textContent = 'НЕТ ДАННЫХ'; heroSub.textContent = 'Ожидание активности игроков';
+            } else if (profit >= 0) {
+                heroBox.classList.add('bg-green-600'); heroTitle.textContent = '+' + profit.toFixed(0) + ' ЭМ'; heroSub.textContent = 'ФАКТИЧЕСКАЯ ЧИСТАЯ ПРИБЫЛЬ';
+            } else {
+                heroBox.classList.add('bg-red-600'); heroTitle.textContent = profit.toFixed(0) + ' ЭМ'; heroSub.textContent = 'УБЫТОК КАЗИНО';
+            }
+            topSpenders.sort((a,b) => b.spent - a.spent);
+            const top10 = topSpenders.slice(0, 10);
+            const ctx = document.getElementById('casino-topSpendersChart').getContext('2d');
+            if (window.CASINO.chart) window.CASINO.chart.destroy();
+            window.CASINO.chart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: top10.map(u => u.name), datasets: [{ label: 'Потрачено (ЭМ)', data: top10.map(u => u.spent), backgroundColor: '#8b5cf6', borderRadius: 6 }] },
+                options: { responsive: true, maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, grid: { color: '#374151' }, ticks: { color: '#9ca3af' } },
+                              x: { grid: { display: false }, ticks: { color: '#e5e7eb', font: {weight: 'bold'} } } },
+                    plugins: { legend: { display: false } } }
+            });
+        }
+
+        // ===== Игроки =====
+        function casinoRenderUsers() {
+            const list = document.getElementById('casino-users-list');
+            list.innerHTML = '';
+            for (const [name, raw] of Object.entries(window.CASINO.users)) {
+                let d = raw;
+                if (typeof raw === 'string') { try { d = JSON.parse(raw); } catch(e){ d = {balance:0,spent:0}; } }
+                const balance = d.balance !== undefined ? d.balance : 0;
+                const spent = d.spent !== undefined ? d.spent : 0;
+                list.innerHTML +=
+                    '<tr class="hover:bg-gray-800/50 transition border-b border-gray-800 last:border-0">'
+                  + '<td class="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-bold text-white player-link" onclick="casinoOpenPlayerStatsModal(\'' + name + '\')" title="Кликните для статистики">' + name + '</td>'
+                  + '<td class="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-400">' + spent + ' ЭМ</td>'
+                  + '<td class="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap"><input type="number" id="casino-bal-' + name + '" value="' + balance + '" class="w-24 sm:w-32 bg-gray-900 text-yellow-400 font-mono font-bold px-2 sm:px-3 py-1.5 rounded border border-gray-700 focus:outline-none focus:border-purple-500"></td>'
+                  + '<td class="px-4 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right"><button onclick="casinoSaveBalance(\'' + name + '\')" class="bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white border border-green-500/50 hover:border-green-500 font-semibold py-1.5 px-3 sm:px-4 rounded transition text-xs sm:text-sm">Сохранить</button></td>'
+                  + '</tr>';
+            }
+        }
+        window.casinoSaveBalance = function(name) {
+            const inputVal = document.getElementById('casino-bal-' + name).value;
+            let cur = window.CASINO.users[name] || {};
+            if (typeof cur === 'string') { try { cur = JSON.parse(cur); } catch(e){ cur = {spent:0}; } }
+            db.ref(CASINO_DB_PATH + '/users/' + name).set({ balance: Number(inputVal), spent: cur.spent || 0 })
+                .then(() => showToast('Баланс ' + name + ' сохранён!', 'success'))
+                .catch(() => showToast('Ошибка сохранения', 'error'));
+        };
+        window.casinoOpenAddUserModal = function() {
+            document.getElementById('casino-add-user-modal').classList.remove('hidden');
+            document.getElementById('casino-new-user-name').value = '';
+            document.getElementById('casino-new-user-bal').value = '0';
+            setTimeout(() => document.getElementById('casino-new-user-name').focus(), 100);
+        };
+        window.casinoCloseAddUserModal = function() { document.getElementById('casino-add-user-modal').classList.add('hidden'); };
+        window.casinoConfirmAddUser = function() {
+            const name = document.getElementById('casino-new-user-name').value.trim();
+            const bal = Number(document.getElementById('casino-new-user-bal').value) || 0;
+            if (!name) { showToast('Введите никнейм!', 'error'); return; }
+            if (window.CASINO.users[name]) { showToast('Игрок уже существует!', 'error'); return; }
+            db.ref(CASINO_DB_PATH + '/users/' + name).set({ balance: bal, spent: 0 })
+                .then(() => { window.casinoCloseAddUserModal(); showToast('Игрок ' + name + ' добавлен', 'success'); })
+                .catch(() => showToast('Ошибка БД', 'error'));
+        };
+
+        window.casinoOpenPlayerStatsModal = function(playerName) {
+            document.getElementById('casino-stats-player-name').textContent = playerName;
+            let u = window.CASINO.users[playerName];
+            if (typeof u === 'string') { try { u = JSON.parse(u); } catch(e){ u = {balance:0,spent:0}; } }
+            if (!u) u = {balance:0,spent:0};
+            document.getElementById('casino-stats-balance').textContent = (u.balance || 0) + ' ЭМ';
+            document.getElementById('casino-stats-spent-total').textContent = (u.spent || 0) + ' ЭМ';
+            let totalDeposited = 0, totalWon = 0, casesOpened = 0, spentLogs = 0, bestWinItem = '', bestWinPrice = -1;
+            const playerLogs = [];
+            window.CASINO.logs.forEach(log => {
+                if (log.user === playerName) {
+                    playerLogs.push(log);
+                    if (log.action === 'ПОПОЛНЕНИЕ' && log.details) {
+                        const m = log.details.match(/Зачислено:\s*(\d+(\.\d+)?)/);
+                        if (m) totalDeposited += Number(m[1]);
+                    }
+                    if (log.action === 'ВЫИГРЫШ' && log.details) {
+                        casesOpened++;
+                        const match = log.details.match(/Выиграл (.*) \(x(\d+)\) из кейса (.*)/);
+                        if (match) {
+                            const itemName = match[1], qty = Number(match[2]), caseName = match[3];
+                            let itemPrice = 0, casePrice = 0, found = false;
+                            const c = window.CASINO.cases.find(c => c && c.name === caseName);
+                            if (c) {
+                                casePrice = Number(c.price) || 0;
+                                if (c.items) {
+                                    let f = c.items.find(it => it.name === itemName && Number(it.qty) === qty);
+                                    if (!f) f = c.items.find(it => it.name === itemName);
+                                    if (f) { itemPrice = Number(f.price) || 0; found = true; }
+                                }
+                            }
+                            if (!found) {
+                                for (const fc of window.CASINO.cases) {
+                                    if (fc && fc.items) {
+                                        let f = fc.items.find(it => it.name === itemName && Number(it.qty) === qty);
+                                        if (!f) f = fc.items.find(it => it.name === itemName);
+                                        if (f) { itemPrice = Number(f.price) || 0; break; }
+                                    }
+                                }
+                            }
+                            spentLogs += casePrice; totalWon += itemPrice;
+                            if (itemPrice > bestWinPrice) { bestWinPrice = itemPrice; bestWinItem = itemName + ' (x' + qty + ') — ' + itemPrice + ' ЭМ'; }
+                        }
+                    }
+                }
+            });
+            const profit = totalWon - spentLogs;
+            const profitEl = document.getElementById('casino-stats-profit');
+            if (profit > 0) { profitEl.textContent = '+' + profit + ' ЭМ'; profitEl.className = 'text-lg sm:text-xl font-black text-green-400 truncate'; }
+            else if (profit < 0) { profitEl.textContent = profit + ' ЭМ'; profitEl.className = 'text-lg sm:text-xl font-black text-red-400 truncate'; }
+            else { profitEl.textContent = '0 ЭМ'; profitEl.className = 'text-lg sm:text-xl font-black text-gray-400 truncate'; }
+            document.getElementById('casino-stats-spent-logs').textContent = spentLogs + ' ЭМ';
+            document.getElementById('casino-stats-won').textContent = totalWon + ' ЭМ';
+            document.getElementById('casino-stats-deposited').textContent = totalDeposited + ' ЭМ';
+            document.getElementById('casino-stats-cases-opened').textContent = casesOpened + ' шт.';
+            document.getElementById('casino-stats-best-win').textContent = bestWinPrice > -1 ? bestWinItem : 'Нет данных';
+            let histHtml = '';
+            const recent = playerLogs.slice(0, 100);
+            if (!recent.length) histHtml = '<tr><td colspan="3" class="px-4 py-4 text-center text-gray-500">Нет истории</td></tr>';
+            else recent.forEach(log => {
+                let cls = 'text-gray-400 bg-gray-800';
+                if (log.action.includes('ВЫИГРЫШ')) cls = 'text-green-400 bg-green-900/30 border border-green-800';
+                if (log.action.includes('ПОПОЛНЕНИЕ')) cls = 'text-yellow-400 bg-yellow-900/30 border border-yellow-800';
+                if (log.action.includes('ОШИБКА') || log.action.includes('УДАЛЕН')) cls = 'text-red-400 bg-red-900/30 border border-red-800';
+                histHtml += '<tr class="hover:bg-gray-800/80 transition border-b border-gray-700/30 last:border-0">'
+                  + '<td class="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap text-[10px] sm:text-xs text-gray-500 font-mono">' + String(log.time||'').replace(/\[|\]/g, '') + '</td>'
+                  + '<td class="px-2 sm:px-4 py-2 sm:py-3 whitespace-nowrap"><span class="text-[8px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded ' + cls + '">' + log.action + '</span></td>'
+                  + '<td class="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-gray-300 break-words">' + log.details + '</td></tr>';
+            });
+            document.getElementById('casino-stats-history-list').innerHTML = histHtml;
+            document.getElementById('casino-player-stats-modal').classList.remove('hidden');
+        };
+        window.casinoClosePlayerStatsModal = function() { document.getElementById('casino-player-stats-modal').classList.add('hidden'); };
+
+        // ===== Кейсы =====
+        function casinoRenderCasesGrid() {
+            document.getElementById('casino-cases-grid-view').classList.remove('hidden');
+            document.getElementById('casino-case-editor-view').classList.add('hidden');
+            const grid = document.getElementById('casino-cases-grid'); grid.innerHTML = '';
+            window.CASINO.cases.forEach((c, idx) => {
+                if (!c) return;
+                let tChance = 0, tEV = 0;
+                const items = c.items || [];
+                items.forEach(i => { tChance += Number(i.chance)||0; tEV += (Number(i.price)||0) * (Number(i.chance)||0); });
+                const ev = tChance > 0 ? tEV/tChance : 0;
+                const profitPerOpen = (Number(c.price) || 0) - ev;
+                const pCol = profitPerOpen >= 0 ? 'text-green-400' : 'text-red-400';
+                const pSign = profitPerOpen > 0 ? '+' : '';
+                grid.innerHTML +=
+                    '<div class="bg-gray-800 rounded-xl border border-gray-700 shadow-lg hover:border-purple-500/50 transition p-4 sm:p-5 flex flex-col justify-between group cursor-pointer" onclick="casinoOpenCaseEditor(' + idx + ')">'
+                  + '<div>'
+                  + '  <div class="flex justify-between items-start mb-3">'
+                  + '    <h3 class="text-lg sm:text-xl font-bold text-white truncate pr-2 group-hover:text-purple-300 transition">' + c.name + '</h3>'
+                  + '    <span class="bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 text-[10px] sm:text-xs font-bold px-2 py-1 rounded-md shrink-0">' + c.price + ' ЭМ</span>'
+                  + '  </div>'
+                  + '  <div class="text-xs sm:text-sm text-gray-400 mb-4">Предметов: <span class="text-gray-200 font-bold">' + items.length + '</span></div>'
+                  + '  <div class="bg-gray-900/80 rounded p-2 text-[10px] sm:text-xs font-mono border border-gray-700/50 mb-4 sm:mb-5">Матожидание профита/открытие:<br><span class="font-bold text-xs sm:text-sm ' + pCol + '">' + pSign + profitPerOpen.toFixed(2) + ' ЭМ</span></div>'
+                  + '</div>'
+                  + '<button class="w-full bg-gray-700 group-hover:bg-purple-600 text-white font-bold py-2 rounded-lg transition text-sm sm:text-base">Настроить</button>'
+                  + '</div>';
+            });
+        }
+        window.casinoCreateNewCase = function() {
+            window.CASINO.cases.push({ name: 'Новый кейс', price: 100, items: [] });
+            db.ref(CASINO_DB_PATH + '/data/cases').set(window.CASINO.cases)
+                .then(() => casinoOpenCaseEditor(window.CASINO.cases.length - 1));
+        };
+        window.casinoOpenCaseEditor = function(idx) { window.CASINO.editingIdx = idx; casinoRenderCaseEditor(idx); };
+        window.casinoCloseCaseEditor = function() { window.CASINO.editingIdx = null; casinoRenderCasesGrid(); };
+        window.casinoAddItemToCase = function() { casinoOpenCatalog(null); };
+        window.casinoDeleteItemFromCase = function(caseIdx, itemIdx) {
+            if (confirm('Удалить этот предмет?')) {
+                window.CASINO.cases[caseIdx].items.splice(itemIdx, 1);
+                casinoRenderCaseEditor(caseIdx);
+            }
+        };
+        window.casinoDeleteCase = function(caseIdx) {
+            if (confirm('Удалить кейс навсегда?')) {
+                window.CASINO.cases.splice(caseIdx, 1);
+                db.ref(CASINO_DB_PATH + '/data/cases').set(window.CASINO.cases)
+                    .then(() => { casinoCloseCaseEditor(); showToast('Кейс удалён', 'success'); });
+            }
+        };
+
+        function casinoRenderCaseEditor(idx) {
+            document.getElementById('casino-cases-grid-view').classList.add('hidden');
+            document.getElementById('casino-case-editor-view').classList.remove('hidden');
+            const c = window.CASINO.cases[idx]; if (!c) { casinoCloseCaseEditor(); return; }
+            const items = c.items || [];
+            let itemsHtml = '';
+            if (!items.length) itemsHtml = '<tr><td colspan="8" class="py-6 text-center text-gray-500">Предметов нет. Выберите из каталога.</td></tr>';
+            else items.forEach((item, i) => {
+                const qty = item.qty || 1; const sysId = item.id || ''; const dmg = item.damage || 0;
+                const iconUrl = casinoGetIconUrl(sysId, dmg);
+                const chanceColor = item.chance < 5 ? 'bg-yellow-400' : item.chance < 20 ? 'bg-purple-400' : item.chance < 60 ? 'bg-blue-400' : item.chance < 80 ? 'bg-green-400' : 'bg-gray-500';
+                itemsHtml +=
+                    '<tr class="border-b border-gray-800 hover:bg-gray-800/80 transition-colors">'
+                  + '<td class="py-2 px-2 text-center" title="' + (item.name || '') + '">'
+                  + '  <div class="w-8 h-8 sm:w-10 sm:h-10 bg-gray-900 rounded flex items-center justify-center border border-gray-700 mx-auto cursor-pointer hover:border-blue-500 transition" onclick="casinoOpenCatalog(' + i + ')">'
+                  + '    <img src="' + iconUrl + '" id="icon-preview-' + i + '" loading="lazy" class="max-w-[80%] max-h-[80%] object-contain pixelated" onerror="this.src=\'' + casinoGetIconUrl('none',0) + '\'">'
+                  + '  </div>'
+                  + '</td>'
+                  + '<td class="py-2 pr-2">'
+                  + '  <div class="flex items-center gap-1 sm:gap-2">'
+                  + '    <div class="w-1 sm:w-1.5 h-full self-stretch rounded-full ' + chanceColor + '"></div>'
+                  + '    <input type="text" id="ed-name-' + i + '" value="' + (item.name || '').replace(/"/g, '&quot;') + '" class="w-full min-w-[120px] bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs sm:text-sm text-white focus:border-purple-500 outline-none">'
+                  + '  </div>'
+                  + '</td>'
+                  + '<td class="py-2 px-1 sm:px-2"><input type="text" id="ed-id-' + i + '" value="' + sysId + '" oninput="casinoUpdateIconPreview(' + i + ')" class="w-full min-w-[100px] bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs sm:text-sm text-gray-300 font-mono outline-none focus:border-purple-500"></td>'
+                  + '<td class="py-2 px-1 sm:px-2"><input type="number" id="ed-damage-' + i + '" value="' + dmg + '" oninput="casinoUpdateIconPreview(' + i + ')" class="w-full min-w-[60px] bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs sm:text-sm text-gray-300 font-mono outline-none focus:border-purple-500"></td>'
+                  + '<td class="py-2 px-1 sm:px-2"><input type="number" id="ed-price-' + i + '" value="' + (item.price ?? 0) + '" class="w-full min-w-[70px] bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs sm:text-sm text-yellow-400 font-mono outline-none focus:border-yellow-500"></td>'
+                  + '<td class="py-2 px-1 sm:px-2"><input type="number" id="ed-qty-' + i + '" value="' + qty + '" class="w-full min-w-[60px] bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs sm:text-sm text-white outline-none focus:border-purple-500"></td>'
+                  + '<td class="py-2 px-1 sm:px-2"><input type="number" step="0.001" id="ed-chance-' + i + '" value="' + (item.chance ?? 0) + '" class="w-full min-w-[70px] bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-xs sm:text-sm text-blue-300 font-mono outline-none focus:border-blue-500"></td>'
+                  + '<td class="py-2 pl-1 sm:pl-2 text-center"><div class="flex items-center justify-center gap-1">'
+                  + '  <button onclick="casinoOpenCatalog(' + i + ')" class="text-blue-400 hover:text-white transition px-1.5 sm:px-2 py-1 sm:py-1.5 bg-gray-900 rounded border border-gray-700 hover:border-blue-500 text-xs">🔍</button>'
+                  + '  <button onclick="casinoDeleteItemFromCase(' + idx + ', ' + i + ')" class="text-red-400 hover:text-white transition px-1.5 sm:px-2 py-1 sm:py-1.5 bg-gray-900 rounded border border-gray-700 hover:border-red-500 text-xs">✕</button>'
+                  + '</div></td>'
+                  + '</tr>';
+            });
+            const container = document.getElementById('casino-case-editor-container');
+            container.innerHTML =
+                '<div class="bg-gray-800 rounded-xl shadow-xl border border-gray-700 overflow-hidden mb-6">'
+              + '  <div class="bg-gray-900/50 p-4 sm:p-6 border-b border-gray-700 flex flex-col gap-4">'
+              + '    <div class="w-full">'
+              + '      <label class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Название кейса</label>'
+              + '      <input type="text" id="casino-ed-case-name" value="' + (c.name || '').replace(/"/g, '&quot;') + '" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 sm:py-2.5 text-lg sm:text-xl font-bold text-white focus:border-purple-500 outline-none">'
+              + '    </div>'
+              + '    <div class="w-full">'
+              + '      <label class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Цена открытия (ЭМ)</label>'
+              + '      <input type="number" id="casino-ed-case-price" value="' + (c.price ?? 0) + '" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 sm:py-2.5 text-lg sm:text-xl font-bold text-yellow-400 focus:border-yellow-500 outline-none">'
+              + '    </div>'
+              + '    <div class="w-full flex flex-col sm:flex-row gap-2 mt-2">'
+              + '      <button onclick="casinoDeleteCase(' + idx + ')" class="w-full sm:w-auto bg-gray-800 hover:bg-red-600 text-gray-400 hover:text-white border border-gray-600 hover:border-red-500 font-bold py-2.5 px-4 rounded-lg transition">Удалить</button>'
+              + '      <button onclick="casinoSaveCaseEdits(' + idx + ')" class="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-2.5 px-6 rounded-lg shadow-lg transition">💾 Сохранить</button>'
+              + '    </div>'
+              + '  </div>'
+              + '  <div class="p-4 sm:p-6">'
+              + '    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">'
+              + '      <h3 class="text-base sm:text-lg font-bold text-white">Таблица предметов</h3>'
+              + '      <button onclick="casinoAddItemToCase()" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-bold py-2 sm:py-1.5 px-4 rounded-lg transition shadow flex justify-center items-center gap-1"><span>🔍 Выбрать из базы</span></button>'
+              + '    </div>'
+              + '    <div class="overflow-x-auto custom-scrollbar pb-2">'
+              + '      <table class="w-full text-left border-collapse min-w-[800px]">'
+              + '        <thead><tr class="text-[10px] sm:text-xs text-gray-400 border-b border-gray-700 bg-gray-900/30">'
+              + '          <th class="pb-2 pt-2 px-2 w-12 sm:w-14 font-semibold text-center">Иконка</th>'
+              + '          <th class="pb-2 pt-2 pr-2 font-semibold">Название</th>'
+              + '          <th class="pb-2 pt-2 px-2 w-28 sm:w-40 font-semibold">Сист. ID</th>'
+              + '          <th class="pb-2 pt-2 px-2 w-16 sm:w-20 font-semibold">Dmg</th>'
+              + '          <th class="pb-2 pt-2 px-2 w-24 sm:w-32 font-semibold">Цена слота</th>'
+              + '          <th class="pb-2 pt-2 px-2 w-16 sm:w-24 font-semibold">Кол-во</th>'
+              + '          <th class="pb-2 pt-2 px-2 w-24 sm:w-32 font-semibold">Шанс (%)</th>'
+              + '          <th class="pb-2 pt-2 pl-2 w-16 sm:w-20 text-center font-semibold">Удал.</th>'
+              + '        </tr></thead>'
+              + '        <tbody>' + itemsHtml + '</tbody>'
+              + '      </table>'
+              + '    </div>'
+              + '  </div>'
+              + '</div>'
+              + '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">'
+              + '  <div class="bg-gray-800 rounded-xl shadow-xl border border-gray-700 p-4 sm:p-6 flex flex-col h-full min-h-[400px]">'
+              + '    <div class="flex justify-between items-center mb-4">'
+              + '      <h4 class="font-bold text-blue-400 text-sm sm:text-lg">Тест (1000 открытий)</h4>'
+              + '      <button onclick="casinoRunSimulationUI(' + idx + ')" class="bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-bold py-1.5 px-3 sm:px-4 rounded-lg transition shadow">Запустить</button>'
+              + '    </div>'
+              + '    <div id="casino-sim-result-box" class="flex-1 flex flex-col bg-gray-900 rounded-lg border border-gray-700 p-3 sm:p-4 overflow-hidden">'
+              + '      <p class="text-gray-500 text-xs sm:text-sm text-center my-auto">Нажмите &quot;Запустить&quot;…</p>'
+              + '    </div>'
+              + '  </div>'
+              + '  <div class="bg-gray-800 rounded-xl shadow-xl border border-gray-700 p-4 sm:p-6 flex flex-col h-fit">'
+              + '    <div class="flex items-center justify-between mb-2">'
+              + '      <h4 class="font-bold text-yellow-400 text-sm sm:text-lg">Советник Smart Curve 🧠</h4>'
+              + '    </div>'
+              + '    <p class="text-xs sm:text-sm text-gray-400 mb-4">Введите желаемую чистую прибыль с 1000 открытий. Алгоритм подберёт шансы.</p>'
+              + '    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 mb-4 bg-gray-900 p-3 rounded-lg border border-gray-700">'
+              + '      <label class="text-xs sm:text-sm font-bold text-gray-400 whitespace-nowrap">Цель (ЭМ):</label>'
+              + '      <input type="number" id="casino-ed-target-profit" value="2000" class="w-full bg-gray-800 text-yellow-400 font-black px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-yellow-500">'
+              + '      <button onclick="casinoAdviseChancesUI(' + idx + ')" class="w-full sm:w-auto bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-5 rounded shadow transition text-sm">Расчёт</button>'
+              + '    </div>'
+              + '    <div id="casino-advice-result-box" class="flex-1"></div>'
+              + '  </div>'
+              + '</div>';
+        }
+
+        window.casinoSaveCaseEdits = function(idx) {
+            const c = window.CASINO.cases[idx];
+            c.name = document.getElementById('casino-ed-case-name').value;
+            c.price = Number(document.getElementById('casino-ed-case-price').value);
+            const items = c.items || [];
+            items.forEach((it, i) => {
+                const n = document.getElementById('ed-name-' + i);
+                if (n) {
+                    it.name = n.value;
+                    it.id = document.getElementById('ed-id-' + i).value;
+                    it.damage = Number(document.getElementById('ed-damage-' + i).value) || 0;
+                    it.price = Number(document.getElementById('ed-price-' + i).value);
+                    it.qty = Number(document.getElementById('ed-qty-' + i).value) || 1;
+                    it.chance = Number(document.getElementById('ed-chance-' + i).value);
+                }
+            });
+            db.ref(CASINO_DB_PATH + '/data/cases/' + idx).set(c)
+                .then(() => { showToast('Кейс сохранён', 'success'); casinoRenderCaseEditor(idx); })
+                .catch(() => showToast('Ошибка сохранения', 'error'));
+        };
+
+        window.casinoRunSimulationUI = function(idx) {
+            const casePrice = Number(document.getElementById('casino-ed-case-price').value);
+            const items = []; let i = 0;
+            while (document.getElementById('ed-name-' + i)) {
+                items.push({
+                    name: document.getElementById('ed-name-' + i).value,
+                    price: Number(document.getElementById('ed-price-' + i).value),
+                    qty: Number(document.getElementById('ed-qty-' + i).value) || 1,
+                    chance: Number(document.getElementById('ed-chance-' + i).value),
+                });
+                i++;
+            }
+            const totalChance = items.reduce((s,it) => s + it.chance, 0);
+            const box = document.getElementById('casino-sim-result-box');
+            if (totalChance <= 0) { box.innerHTML = '<p class="text-red-400">Сумма шансов 0!</p>'; return; }
+            const N = 1000;
+            const totalSpentByUser = casePrice * N;
+            let totalGiven = 0;
+            const stats = {};
+            items.forEach(it => { const d = it.name + (it.qty > 1 ? ' x' + it.qty : ''); stats[d] = { count: 0, val: 0 }; });
+            for (let j = 0; j < N; j++) {
+                const r = Math.random() * totalChance; let cum = 0;
+                for (const it of items) {
+                    cum += it.chance;
+                    if (r <= cum) { totalGiven += it.price; const d = it.name + (it.qty > 1 ? ' x' + it.qty : ''); stats[d].count++; stats[d].val += it.price; break; }
+                }
+            }
+            const profit = totalSpentByUser - totalGiven;
+            const roi = (profit / totalSpentByUser) * 100;
+            const sorted = Object.keys(stats).sort((a,b) => stats[b].count - stats[a].count);
+            let tbody = '';
+            for (const n of sorted) {
+                const s = stats[n];
+                if (s.count > 0) tbody += '<tr class="border-b border-gray-800 hover:bg-gray-800/50"><td class="py-1 sm:py-1.5 text-gray-300 pr-2">' + n + '</td><td class="py-1 sm:py-1.5 text-center font-mono text-white">' + s.count + '</td><td class="py-1 sm:py-1.5 text-right text-yellow-400 font-mono">' + s.val.toFixed(0) + '</td></tr>';
+            }
+            box.innerHTML =
+                '<div class="grid grid-cols-2 gap-1 sm:gap-2 text-[10px] sm:text-xs mb-3 font-mono">'
+              + '<div class="bg-gray-900/80 p-1.5 sm:p-2 rounded border border-gray-700">Оборот:<br><b class="text-white text-[10px] sm:text-sm truncate block">' + totalSpentByUser.toFixed(0) + ' ЭМ</b></div>'
+              + '<div class="bg-gray-900/80 p-1.5 sm:p-2 rounded border border-gray-700">Выдано:<br><b class="text-white text-[10px] sm:text-sm truncate block">' + totalGiven.toFixed(0) + ' ЭМ</b></div>'
+              + '<div class="bg-gray-900/80 p-1.5 sm:p-2 rounded border ' + (profit>=0 ? 'border-green-900':'border-red-900') + '">Профит:<br><b class="text-[10px] sm:text-sm truncate block ' + (profit>=0?'text-green-400':'text-red-400') + '">' + (profit>0?'+':'') + profit.toFixed(0) + ' ЭМ</b></div>'
+              + '<div class="bg-gray-900/80 p-1.5 sm:p-2 rounded border ' + (roi>=0?'border-green-900':'border-red-900') + '">Маржа:<br><b class="text-[10px] sm:text-sm truncate block ' + (roi>=0?'text-green-400':'text-red-400') + '">' + (roi>0?'+':'') + roi.toFixed(1) + '%</b></div>'
+              + '</div>'
+              + '<div class="flex-1 overflow-y-auto custom-scrollbar pr-1">'
+              + '<table class="w-full text-left text-[10px] sm:text-xs border-collapse min-w-[250px]">'
+              + '<thead class="sticky top-0 bg-gray-900 shadow-sm z-10"><tr class="text-gray-500 uppercase"><th class="pb-1 sm:pb-2 pt-1">Предмет</th><th class="pb-1 sm:pb-2 pt-1 text-center">Выпал</th><th class="pb-1 sm:pb-2 pt-1 text-right">Сумма</th></tr></thead>'
+              + '<tbody>' + tbody + '</tbody></table></div>';
+        };
+
+        window.casinoAdviseChancesUI = function(idx) {
+            const casePrice = Number(document.getElementById('casino-ed-case-price').value);
+            const target = Number(document.getElementById('casino-ed-target-profit').value);
+            const targetEV = casePrice - (target / 1000);
+            const items = []; let i = 0;
+            while (document.getElementById('ed-name-' + i)) {
+                items.push({
+                    name: document.getElementById('ed-name-' + i).value,
+                    price: Math.max(0.01, Number(document.getElementById('ed-price-' + i).value)),
+                });
+                i++;
+            }
+            const adv = document.getElementById('casino-advice-result-box');
+            if (items.length < 2) { adv.innerHTML = '<div class="text-red-400">Нужно минимум 2 предмета</div>'; return; }
+            const minP = Math.min(...items.map(it => it.price));
+            const maxP = Math.max(...items.map(it => it.price));
+            if (targetEV <= minP) { adv.innerHTML = '<div class="text-red-400 bg-red-900/20 p-3 rounded">Прибыль ' + target + ' ЭМ недостижима — дешевейший предмет ' + minP + ' ЭМ</div>'; return; }
+            if (targetEV >= maxP) { adv.innerHTML = '<div class="text-red-400 bg-red-900/20 p-3 rounded">Невозможно — дорогой предмет ' + maxP + ' ЭМ. Игрок гарантированно убыточен</div>'; return; }
+            function getEV(k) { let sw=0, swp=0; for (const it of items) { const w = Math.pow(it.price, -k); sw += w; swp += w*it.price; } return swp/sw; }
+            let lo = -20, hi = 20, k = 0;
+            for (let step = 0; step < 60; step++) { k = (lo+hi)/2; if (getEV(k) > targetEV) lo = k; else hi = k; }
+            let sw = 0; items.forEach(it => { it.weight = Math.pow(it.price, -k); sw += it.weight; });
+            const newChances = [];
+            let html = '<ul class="text-[10px] sm:text-sm space-y-1 mt-3 mb-4 max-h-48 overflow-y-auto custom-scrollbar pr-2">';
+            items.forEach(it => {
+                const nc = (it.weight/sw)*100;
+                newChances.push(nc.toFixed(3));
+                html += '<li class="flex justify-between border-b border-gray-700/50 pb-1"><span class="text-gray-400 truncate pr-2">' + it.name + ' <span class="text-[8px] sm:text-xs text-gray-500">(' + it.price + ' ЭМ)</span></span><span class="font-mono text-yellow-400 whitespace-nowrap">' + nc.toFixed(3) + '%</span></li>';
+            });
+            html += '</ul>';
+            adv.innerHTML = '<div class="mt-3 sm:mt-4 p-3 sm:p-4 bg-gray-900 rounded-lg border border-yellow-600/50 shadow-inner"><div class="text-[10px] sm:text-xs text-yellow-500 mb-1 uppercase tracking-wider font-bold">Оптимальные шансы:</div>' + html + '<button onclick="casinoApplyAdviceEdits([' + newChances + '])" class="w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-1.5 sm:py-2 rounded transition shadow">Применить</button></div>';
+        };
+        window.casinoApplyAdviceEdits = function(chances) {
+            chances.forEach((c, i) => {
+                const el = document.getElementById('ed-chance-' + i);
+                if (el) { el.value = c; el.classList.add('bg-green-900/50', 'border-green-500'); setTimeout(() => el.classList.remove('bg-green-900/50', 'border-green-500'), 1500); }
+            });
+            document.getElementById('casino-advice-result-box').innerHTML = '';
+            showToast('Шансы изменены — не забудь сохранить', 'success');
+        };
+
+        // ===== Логи казино =====
+        function casinoRenderLogs() {
+            const list = document.getElementById('casino-logs-list');
+            list.innerHTML = '';
+            window.CASINO.logs.slice(0, 200).forEach(log => {
+                let cls = 'text-gray-400 bg-gray-800';
+                if (log.action && log.action.includes('ВЫИГРЫШ')) cls = 'text-green-400 bg-green-900/30 border border-green-800';
+                if (log.action && log.action.includes('ПОПОЛНЕНИЕ')) cls = 'text-yellow-400 bg-yellow-900/30 border border-yellow-800';
+                if (log.action && (log.action.includes('ОШИБКА') || log.action.includes('УДАЛЕН'))) cls = 'text-red-400 bg-red-900/30 border border-red-800';
+                list.innerHTML +=
+                    '<tr class="hover:bg-gray-800/80 transition">'
+                  + '<td class="px-4 py-2 sm:py-2.5 whitespace-nowrap text-[10px] sm:text-xs text-gray-500 font-mono">' + String(log.time||'').replace(/\[|\]/g, '') + '</td>'
+                  + '<td class="px-4 py-2 sm:py-2.5 whitespace-nowrap text-xs sm:text-sm font-bold text-purple-300">' + (log.user || '') + '</td>'
+                  + '<td class="px-4 py-2 sm:py-2.5 whitespace-nowrap"><span class="text-[8px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded ' + cls + '">' + (log.action || '') + '</span></td>'
+                  + '<td class="px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-gray-300 break-words">' + (log.details || '') + '</td>'
+                  + '</tr>';
+            });
+        }
 
         function showToast(message, type) {
             const toast = document.createElement('div');
