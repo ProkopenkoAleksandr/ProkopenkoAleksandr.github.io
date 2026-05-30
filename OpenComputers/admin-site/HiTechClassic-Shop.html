@@ -145,8 +145,128 @@
             <!-- ============================================================ -->
             <div id="content-shop" class="tab-content hidden">
                 <div class="mb-6 flex space-x-1 overflow-x-auto custom-scrollbar">
-                    <button onclick="shopSwitchSubTab('users')" class="shop-subtab-btn active px-4 py-2 rounded-lg text-sm font-semibold text-gray-400 hover:text-white hover:bg-gray-700 transition" data-sub="users">👥 Игроки</button>
+                    <button onclick="shopSwitchSubTab('analytics')" class="shop-subtab-btn active px-4 py-2 rounded-lg text-sm font-semibold text-gray-400 hover:text-white hover:bg-gray-700 transition" data-sub="analytics">📊 Аналитика</button>
+                    <button onclick="shopSwitchSubTab('users')" class="shop-subtab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-400 hover:text-white hover:bg-gray-700 transition" data-sub="users">👥 Игроки</button>
                     <button onclick="shopSwitchSubTab('items')" class="shop-subtab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-400 hover:text-white hover:bg-gray-700 transition" data-sub="items">📦 Товары</button>
+                </div>
+
+                <!-- Аналитика магазина -->
+                <div id="shop-sub-analytics" class="shop-sub-content">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 gap-2">
+                        <div>
+                            <h2 class="text-2xl sm:text-3xl font-black text-white">Аналитика магазина</h2>
+                            <p class="text-xs sm:text-sm text-gray-400 mt-1">На основе логов <code class="text-blue-300">/logs</code>. Учитываются последние 500 записей.</p>
+                        </div>
+                    </div>
+
+                    <!-- Hero: чистая прибыль -->
+                    <div id="shop-analytics-hero" class="w-full p-5 sm:p-8 rounded-2xl mb-6 sm:mb-8 relative overflow-hidden flex items-center justify-between border bg-gray-800">
+                        <div class="relative z-10">
+                            <h3 class="text-xs sm:text-sm font-bold tracking-widest uppercase mb-1 sm:mb-2 opacity-80" id="shop-hero-subtitle">Чистая выручка магазина</h3>
+                            <div class="text-4xl sm:text-5xl md:text-7xl font-black drop-shadow-md tracking-tight break-all" id="shop-hero-title">—</div>
+                        </div>
+                        <div class="relative z-10 text-6xl sm:text-8xl md:text-9xl opacity-20 drop-shadow-2xl absolute right-4">💰</div>
+                    </div>
+
+                    <!-- KPI плитки -->
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-6">
+                        <div class="bg-gray-800 rounded-lg p-3 sm:p-4 border border-gray-700">
+                            <div class="text-[10px] sm:text-xs uppercase text-gray-500 font-bold mb-1">Оборот ПОКУПОК</div>
+                            <div id="shop-stat-bought" class="text-xl sm:text-2xl font-black text-green-400 truncate">0 ЭМ</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-3 sm:p-4 border border-gray-700">
+                            <div class="text-[10px] sm:text-xs uppercase text-gray-500 font-bold mb-1">Оборот СКУПКИ</div>
+                            <div id="shop-stat-sold" class="text-xl sm:text-2xl font-black text-yellow-400 truncate">0 ЭМ</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-3 sm:p-4 border border-gray-700">
+                            <div class="text-[10px] sm:text-xs uppercase text-gray-500 font-bold mb-1">Транзакций покупок</div>
+                            <div id="shop-stat-buyCount" class="text-xl sm:text-2xl font-black text-white truncate">0</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-3 sm:p-4 border border-gray-700">
+                            <div class="text-[10px] sm:text-xs uppercase text-gray-500 font-bold mb-1">Транзакций скупок</div>
+                            <div id="shop-stat-sellCount" class="text-xl sm:text-2xl font-black text-white truncate">0</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-3 sm:p-4 border border-gray-700">
+                            <div class="text-[10px] sm:text-xs uppercase text-gray-500 font-bold mb-1">Активных игроков</div>
+                            <div id="shop-stat-playersCount" class="text-xl sm:text-2xl font-black text-white truncate">0</div>
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-3 sm:p-4 border border-gray-700">
+                            <div class="text-[10px] sm:text-xs uppercase text-gray-500 font-bold mb-1">Маржа</div>
+                            <div id="shop-stat-margin" class="text-xl sm:text-2xl font-black text-purple-400 truncate">—</div>
+                        </div>
+                    </div>
+
+                    <!-- Графики и таблицы -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                        <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 shadow-md">
+                            <h3 class="text-base font-bold mb-4 text-white">Топ-10 проданных товаров (по обороту)</h3>
+                            <div class="h-48 sm:h-64"><canvas id="shop-topBoughtChart"></canvas></div>
+                        </div>
+                        <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 shadow-md">
+                            <h3 class="text-base font-bold mb-4 text-white">Топ-10 игроков по тратам</h3>
+                            <div class="h-48 sm:h-64"><canvas id="shop-topSpendersChart"></canvas></div>
+                        </div>
+                    </div>
+
+                    <!-- Таблица проданных -->
+                    <div class="bg-gray-800 rounded-xl border border-gray-700 mb-6 overflow-hidden">
+                        <div class="bg-gray-900 px-4 py-3 border-b border-gray-700">
+                            <h3 class="text-base font-bold text-white">📦 Что игроки покупают</h3>
+                        </div>
+                        <div class="overflow-x-auto custom-scrollbar">
+                            <table class="w-full text-left text-xs sm:text-sm min-w-[500px]">
+                                <thead class="bg-gray-900/50 text-gray-400 uppercase text-[10px]">
+                                    <tr>
+                                        <th class="px-4 py-2">Товар</th>
+                                        <th class="px-4 py-2 text-right">Штук</th>
+                                        <th class="px-4 py-2 text-right">Транзакций</th>
+                                        <th class="px-4 py-2 text-right">Выручка ЭМ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="shop-table-bought" class="divide-y divide-gray-700/50"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Таблица скупленных -->
+                    <div class="bg-gray-800 rounded-xl border border-gray-700 mb-6 overflow-hidden">
+                        <div class="bg-gray-900 px-4 py-3 border-b border-gray-700">
+                            <h3 class="text-base font-bold text-white">🔄 Что игроки нам сдают</h3>
+                        </div>
+                        <div class="overflow-x-auto custom-scrollbar">
+                            <table class="w-full text-left text-xs sm:text-sm min-w-[400px]">
+                                <thead class="bg-gray-900/50 text-gray-400 uppercase text-[10px]">
+                                    <tr>
+                                        <th class="px-4 py-2">Товар</th>
+                                        <th class="px-4 py-2 text-right">Штук</th>
+                                        <th class="px-4 py-2 text-right">Сдач (раз)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="shop-table-sold" class="divide-y divide-gray-700/50"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Таблица игроков -->
+                    <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                        <div class="bg-gray-900 px-4 py-3 border-b border-gray-700">
+                            <h3 class="text-base font-bold text-white">👥 Активные игроки</h3>
+                        </div>
+                        <div class="overflow-x-auto custom-scrollbar">
+                            <table class="w-full text-left text-xs sm:text-sm min-w-[500px]">
+                                <thead class="bg-gray-900/50 text-gray-400 uppercase text-[10px]">
+                                    <tr>
+                                        <th class="px-4 py-2">Игрок</th>
+                                        <th class="px-4 py-2 text-right">Потратил ЭМ</th>
+                                        <th class="px-4 py-2 text-right">Получил ЭМ</th>
+                                        <th class="px-4 py-2 text-right">Чистый</th>
+                                        <th class="px-4 py-2 text-right">Транзакций</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="shop-table-players" class="divide-y divide-gray-700/50"></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Игроки -->
@@ -711,7 +831,7 @@
             if (tabId === 'mestore') mestoreInit();
         }
 
-        // Магазин — переключение между Игроки / Товары
+        // Магазин — переключение между Аналитика / Игроки / Товары
         function shopSwitchSubTab(sub) {
             document.querySelectorAll('.shop-sub-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.shop-subtab-btn').forEach(el => {
@@ -725,8 +845,210 @@
                 btn.classList.add('active', 'bg-gray-800', 'text-white');
                 btn.classList.remove('text-gray-400');
             }
+            if (sub === 'analytics') shopRenderAnalytics();
         }
         window.shopSwitchSubTab = shopSwitchSubTab;
+
+        // =====================================================================
+        // Аналитика магазина — парсит /logs и агрегирует
+        // =====================================================================
+        window.SHOP_ANALYTICS = { topBoughtChart: null, topSpendersChart: null };
+
+        function parseShopLogs(logs) {
+            let totalBought = 0;     // игроки заплатили (выручка)
+            let totalSold = 0;       // мы выплатили (скупка)
+            let buyCount = 0, sellCount = 0;
+            const itemsBought = {};  // {name: {qty, total, count}}
+            const itemsSold = {};    // {name: {qty, count}}
+            const players = {};      // {name: {spent, received, count}}
+
+            const reBuy   = /^(.+?)\s+x(\d+)\s+по\s+([\d.]+)\s+ЭМ\s+=\s+([\d.]+)\s+ЭМ/;
+            const reTotal = /Сумма:\s*([\d.]+)/;
+            const reEarn  = /Начислено:\s*([\d.]+)/;
+            const reItemQty = /([^\s(){}|]+(?:\s[^\s(){}|]+)*?)\(x(\d+)\)/g;
+
+            for (const log of logs) {
+                if (!log || log.user === 'crafter' || log.user === 'casino' || log.user === 'obmen' || log.user === 'me_snapshot' || log.user === 'system') continue;
+                const action = String(log.action || '');
+                const details = String(log.details || '');
+                const user = log.user || '?';
+
+                if (action === 'ПОКУПКА') {
+                    const m = details.match(reBuy);
+                    if (m) {
+                        const name = m[1].trim();
+                        const qty = +m[2], total = +m[4];
+                        totalBought += total; buyCount++;
+                        const it = itemsBought[name] = itemsBought[name] || {qty:0, total:0, count:0};
+                        it.qty += qty; it.total += total; it.count++;
+                        const p = players[user] = players[user] || {spent:0, received:0, count:0};
+                        p.spent += total; p.count++;
+                    }
+                } else if (action === 'ПОКУПКА (КОРЗИНА)') {
+                    const sm = details.match(reTotal);
+                    if (sm) {
+                        const total = +sm[1];
+                        totalBought += total; buyCount++;
+                        // парсим receipt: «name(xN) name(xM) ...»
+                        let m;
+                        reItemQty.lastIndex = 0;
+                        const found = [];
+                        while ((m = reItemQty.exec(details)) !== null) {
+                            found.push({ name: m[1].trim(), qty: +m[2] });
+                        }
+                        // распределим total пропорционально qty (грубо)
+                        const qSum = found.reduce((s, x) => s + x.qty, 0) || 1;
+                        for (const f of found) {
+                            const portion = total * f.qty / qSum;
+                            const it = itemsBought[f.name] = itemsBought[f.name] || {qty:0, total:0, count:0};
+                            it.qty += f.qty; it.total += portion; it.count++;
+                        }
+                        const p = players[user] = players[user] || {spent:0, received:0, count:0};
+                        p.spent += total; p.count++;
+                    }
+                } else if (action === 'ПРОДАЖА') {
+                    const em = details.match(reEarn);
+                    if (em) {
+                        const earned = +em[1];
+                        totalSold += earned; sellCount++;
+                        let m;
+                        reItemQty.lastIndex = 0;
+                        while ((m = reItemQty.exec(details)) !== null) {
+                            const name = m[1].trim(), qty = +m[2];
+                            const it = itemsSold[name] = itemsSold[name] || {qty:0, count:0};
+                            it.qty += qty; it.count++;
+                        }
+                        const p = players[user] = players[user] || {spent:0, received:0, count:0};
+                        p.received += earned; p.count++;
+                    }
+                }
+            }
+            return { totalBought, totalSold, buyCount, sellCount, itemsBought, itemsSold, players };
+        }
+
+        function shopRenderAnalytics() {
+            const all = (window.LOGS_STATE && window.LOGS_STATE.shared) ? window.LOGS_STATE.shared : [];
+            const stats = parseShopLogs(all);
+
+            const profit = stats.totalBought - stats.totalSold;
+            const margin = stats.totalBought > 0 ? (profit / stats.totalBought * 100) : 0;
+
+            // Hero
+            const heroBox = document.getElementById('shop-analytics-hero');
+            const heroTitle = document.getElementById('shop-hero-title');
+            const heroSub = document.getElementById('shop-hero-subtitle');
+            heroBox.classList.remove('bg-green-600', 'bg-red-600', 'bg-gray-800');
+            if (stats.totalBought === 0 && stats.totalSold === 0) {
+                heroBox.classList.add('bg-gray-800');
+                heroTitle.textContent = 'НЕТ ДАННЫХ';
+                heroSub.textContent = 'В логах нет транзакций ПОКУПКА/ПРОДАЖА';
+            } else if (profit >= 0) {
+                heroBox.classList.add('bg-green-600');
+                heroTitle.textContent = '+' + profit.toFixed(0) + ' ЭМ';
+                heroSub.textContent = 'Чистая выручка магазина';
+            } else {
+                heroBox.classList.add('bg-red-600');
+                heroTitle.textContent = profit.toFixed(0) + ' ЭМ';
+                heroSub.textContent = 'Магазин в минусе';
+            }
+
+            document.getElementById('shop-stat-bought').textContent = stats.totalBought.toFixed(0) + ' ЭМ';
+            document.getElementById('shop-stat-sold').textContent = stats.totalSold.toFixed(0) + ' ЭМ';
+            document.getElementById('shop-stat-buyCount').textContent = stats.buyCount;
+            document.getElementById('shop-stat-sellCount').textContent = stats.sellCount;
+            document.getElementById('shop-stat-playersCount').textContent = Object.keys(stats.players).length;
+            document.getElementById('shop-stat-margin').textContent =
+                stats.totalBought > 0 ? (margin.toFixed(1) + '%') : '—';
+
+            // Топ-10 проданных по обороту
+            const boughtArr = Object.entries(stats.itemsBought)
+                .map(([n, v]) => ({ name: n, ...v }))
+                .sort((a, b) => b.total - a.total);
+            const ctx1 = document.getElementById('shop-topBoughtChart').getContext('2d');
+            if (window.SHOP_ANALYTICS.topBoughtChart) window.SHOP_ANALYTICS.topBoughtChart.destroy();
+            const top10b = boughtArr.slice(0, 10);
+            window.SHOP_ANALYTICS.topBoughtChart = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: top10b.map(x => x.name.length > 18 ? x.name.slice(0, 17) + '…' : x.name),
+                    datasets: [{ label: 'Выручка ЭМ', data: top10b.map(x => x.total), backgroundColor: '#22c55e', borderRadius: 4 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                    scales: { x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }, y: { ticks: { color: '#e5e7eb' }, grid: { display: false } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            // Топ-10 игроков по тратам
+            const playersArr = Object.entries(stats.players).map(([n, v]) => ({ name: n, ...v }))
+                .sort((a, b) => b.spent - a.spent);
+            const top10p = playersArr.slice(0, 10);
+            const ctx2 = document.getElementById('shop-topSpendersChart').getContext('2d');
+            if (window.SHOP_ANALYTICS.topSpendersChart) window.SHOP_ANALYTICS.topSpendersChart.destroy();
+            window.SHOP_ANALYTICS.topSpendersChart = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: top10p.map(x => x.name),
+                    datasets: [{ label: 'Потрачено ЭМ', data: top10p.map(x => x.spent), backgroundColor: '#8b5cf6', borderRadius: 4 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { x: { ticks: { color: '#e5e7eb' }, grid: { display: false } }, y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            // Таблица проданных (top 50)
+            const tBought = document.getElementById('shop-table-bought');
+            if (!boughtArr.length) {
+                tBought.innerHTML = '<tr><td colspan="4" class="px-4 py-4 text-center text-gray-500">нет покупок в логах</td></tr>';
+            } else {
+                tBought.innerHTML = boughtArr.slice(0, 50).map(x =>
+                    '<tr class="hover:bg-gray-800/60">'
+                  + '  <td class="px-4 py-2 text-white">' + neiEsc(x.name) + '</td>'
+                  + '  <td class="px-4 py-2 text-right tabular text-amber-300">' + x.qty.toLocaleString('ru') + '</td>'
+                  + '  <td class="px-4 py-2 text-right tabular text-gray-400">' + x.count + '</td>'
+                  + '  <td class="px-4 py-2 text-right tabular text-green-400 font-bold">' + x.total.toFixed(0) + '</td>'
+                  + '</tr>'
+                ).join('');
+            }
+
+            // Таблица скупленных
+            const soldArr = Object.entries(stats.itemsSold).map(([n, v]) => ({ name: n, ...v }))
+                .sort((a, b) => b.qty - a.qty);
+            const tSold = document.getElementById('shop-table-sold');
+            if (!soldArr.length) {
+                tSold.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-gray-500">нет скупки в логах</td></tr>';
+            } else {
+                tSold.innerHTML = soldArr.slice(0, 50).map(x =>
+                    '<tr class="hover:bg-gray-800/60">'
+                  + '  <td class="px-4 py-2 text-white">' + neiEsc(x.name) + '</td>'
+                  + '  <td class="px-4 py-2 text-right tabular text-amber-300">' + x.qty.toLocaleString('ru') + '</td>'
+                  + '  <td class="px-4 py-2 text-right tabular text-gray-400">' + x.count + '</td>'
+                  + '</tr>'
+                ).join('');
+            }
+
+            // Таблица игроков
+            const tPlayers = document.getElementById('shop-table-players');
+            if (!playersArr.length) {
+                tPlayers.innerHTML = '<tr><td colspan="5" class="px-4 py-4 text-center text-gray-500">нет активности</td></tr>';
+            } else {
+                tPlayers.innerHTML = playersArr.map(p => {
+                    const net = p.spent - p.received;
+                    const netCls = net > 0 ? 'text-green-400' : (net < 0 ? 'text-red-400' : 'text-gray-400');
+                    return '<tr class="hover:bg-gray-800/60">'
+                      + '<td class="px-4 py-2 text-purple-300 font-bold">' + neiEsc(p.name) + '</td>'
+                      + '<td class="px-4 py-2 text-right tabular text-green-400">' + p.spent.toFixed(0) + '</td>'
+                      + '<td class="px-4 py-2 text-right tabular text-yellow-400">' + p.received.toFixed(0) + '</td>'
+                      + '<td class="px-4 py-2 text-right tabular ' + netCls + ' font-bold">' + (net >= 0 ? '+' : '') + net.toFixed(0) + '</td>'
+                      + '<td class="px-4 py-2 text-right tabular text-gray-400">' + p.count + '</td>'
+                      + '</tr>';
+                }).join('');
+            }
+        }
+        window.shopRenderAnalytics = shopRenderAnalytics;
 
         function loadData() {
             // ПОЛЬЗОВАТЕЛИ
@@ -865,7 +1187,7 @@
                 shared: [], casino: [], filter: 'all', search: '', bound: false
             };
 
-            db.ref('logs').orderByKey().limitToLast(200).on('value', (snapshot) => {
+            db.ref('logs').orderByKey().limitToLast(500).on('value', (snapshot) => {
                 const raw = snapshot.val() || {};
                 const arr = [];
                 for (const key in raw) {
@@ -956,6 +1278,11 @@
             // если статус крафтера ещё не пришёл — пересчитаем его по логам
             if (!window.CRAFTER_STATUS && document.getElementById('crafter-status-body')) {
                 try { renderCrafterStatus(); } catch(e) {}
+            }
+            // обновляем аналитику магазина, если её вкладка открыта
+            const shopAn = document.getElementById('shop-sub-analytics');
+            if (shopAn && !shopAn.classList.contains('hidden')) {
+                try { shopRenderAnalytics(); } catch(e) {}
             }
 
             // ограничение
