@@ -975,6 +975,7 @@
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                    animation: false,
                     scales: { x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }, y: { ticks: { color: '#e5e7eb' }, grid: { display: false } } },
                     plugins: { legend: { display: false } }
                 }
@@ -994,6 +995,7 @@
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
+                    animation: false,
                     scales: { x: { ticks: { color: '#e5e7eb' }, grid: { display: false } }, y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } } },
                     plugins: { legend: { display: false } }
                 }
@@ -1279,10 +1281,13 @@
             if (!window.CRAFTER_STATUS && document.getElementById('crafter-status-body')) {
                 try { renderCrafterStatus(); } catch(e) {}
             }
-            // обновляем аналитику магазина, если её вкладка открыта
+            // обновляем аналитику магазина (с дебаунсом, чтобы графики не мерцали)
             const shopAn = document.getElementById('shop-sub-analytics');
             if (shopAn && !shopAn.classList.contains('hidden')) {
-                try { shopRenderAnalytics(); } catch(e) {}
+                clearTimeout(window._shopAnRedrawTimer);
+                window._shopAnRedrawTimer = setTimeout(() => {
+                    try { shopRenderAnalytics(); } catch(e) {}
+                }, 1500);
             }
 
             // ограничение
@@ -2990,7 +2995,7 @@
             window.CASINO.chart = new Chart(ctx, {
                 type: 'bar',
                 data: { labels: top10.map(u => u.name), datasets: [{ label: 'Потрачено (ЭМ)', data: top10.map(u => u.spent), backgroundColor: '#8b5cf6', borderRadius: 6 }] },
-                options: { responsive: true, maintainAspectRatio: false,
+                options: { responsive: true, maintainAspectRatio: false, animation: false,
                     scales: { y: { beginAtZero: true, grid: { color: '#374151' }, ticks: { color: '#9ca3af' } },
                               x: { grid: { display: false }, ticks: { color: '#e5e7eb', font: {weight: 'bold'} } } },
                     plugins: { legend: { display: false } } }
