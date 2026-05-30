@@ -2100,26 +2100,29 @@
         window.casinoHideTooltip = casinoHideTooltip;
         window.casinoPositionTooltip = casinoPositionTooltip;
 
-        // ===== Каталог: открытие/закрытие =====
-        window.casinoOpenCatalog = async function(itemIdx) {
+        // ===== Лёгкий каталог: открытие/закрытие =====
+        // Не рендерим 300 слотов сразу. Показываем только результаты поиска (до 10).
+        // JSON грузится в фоне; пока не загружен — поиск пишет «загрузка».
+        window.casinoOpenCatalog = function(itemIdx) {
             window.CASINO.catalogTargetItemIdx = itemIdx;
             document.getElementById('casino-catalog-modal').classList.remove('hidden');
-            const grid = document.getElementById('casino-cat-grid');
-            const count = document.getElementById('casino-catalog-count');
-            // Если каталог NEI ещё не загружен — показываем прелоадер и грузим
+            const search = document.getElementById('casino-cat-search');
+            search.value = '';
+            search.focus();
+            // фоновая загрузка каталога, если не загружен
             if (!window.NEI || !window.NEI.all || !window.NEI.all.length) {
-                grid.innerHTML = '<div class="w-full text-center text-gray-400 py-12 font-bold">Загрузка каталога (~14 МБ)…</div>';
-                count.textContent = 'Загрузка...';
-                try {
-                    await neiInitOnce();
-                } catch (e) {
-                    grid.innerHTML = '<div class="w-full text-center text-red-400 py-12 font-bold">Не удалось загрузить каталог: ' + e.message + '</div>';
-                    return;
-                }
+                document.getElementById('casino-catalog-count').textContent = 'Загрузка базы…';
+                neiInitOnce().then(() => {
+                    casinoFillCatalogModFilter();
+                    casinoRenderCatalogItems();
+                }).catch((e) => {
+                    document.getElementById('casino-cat-grid').innerHTML =
+                        '<div class="w-full text-center text-red-400 py-8 font-bold">Не удалось загрузить базу: ' + e.message + '</div>';
+                });
+            } else {
+                casinoFillCatalogModFilter();
             }
-            casinoFillCatalogModFilter();
             casinoRenderCatalogItems();
-            document.getElementById('casino-cat-search').focus();
         };
         window.casinoCloseCatalog = function() {
             document.getElementById('casino-catalog-modal').classList.add('hidden');
@@ -2128,38 +2131,79 @@
         };
 
         function casinoRenderCatalogItems() {
-            const search = document.getElementById('casino-cat-search').value.toLowerCase();
+            const search = document.getElementById('casino-cat-search').value.trim().toLowerCase();
             const mod = document.getElementById('casino-cat-mod').value;
             const grid = document.getElementById('casino-cat-grid');
             const empty = document.getElementById('casino-cat-empty');
-            grid.innerHTML = '';
-            const arr = (window.NEI && window.NEI.all) ? window.NEI.all : [];
-            const filtered = arr.filter(it => {
-                if (mod !== 'ALL' && it.mod_id !== mod) return false;
-                if (search) {
-                    return (it.name && it.name.toLowerCase().includes(search))
-                        || (it.id && it.id.toLowerCase().includes(search));
-                }
-                return true;
-            });
-            if (filtered.length === 0) { empty.classList.remove('hidden'); return; }
             empty.classList.add('hidden');
-            filtered.slice(0, 300).forEach(it => {
-                const imgUrl = it.icon ? ('./item_icons/' + it.icon) : casinoGetIconUrl(it.id, it.metadata);
-                const safeName = (it.name || 'Неизвестно').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                const numId = it.numeric_id ?? '?';
-                const dmg = it.metadata ?? 0;
-                grid.innerHTML +=
-                    '<div class="w-[52px] h-[52px] sm:w-[60px] sm:h-[60px] mc-slot cursor-pointer flex items-center justify-center p-1"'
-                    + ' onclick="casinoSelectCatalogItem(\'' + it.id + '\', ' + dmg + ', \'' + safeName + '\')"'
-                    + ' onmouseenter="casinoShowTooltip(event, \'' + safeName + '\', \'' + numId + '\', ' + dmg + ', \'' + it.id + '\')"'
-                    + ' onmouseleave="casinoHideTooltip()"'
-                    + ' onmousemove="casinoPositionTooltip(event)">'
-                    + '<img src="' + imgUrl + '" loading="lazy" class="max-w-full max-h-full object-contain pixelated" onerror="this.src=\'' + casinoGetIconUrl('none',0) + '\'">'
+            grid.innerHTML = '';
+
+            const arr = (window.NEI && window.NEI.all) ? window.NEI.all : [];
+
+            // База ещё грузится
+            if (!arr.length) {
+                grid.innerHTML = '<div class="w-full text-center text-gray-400 py-8 font-bold">⏳ Загрузка базы (~14 МБ)…</div>';
+                return;
+            }
+
+            // Подсказка пока пользователь не ввёл запрос
+            if (!search && mod === 'ALL') {
+                grid.innerHTML = '<div class="w-full text-center text-gray-500 py-8 text-sm">'
+                    + '🔍 Начни вводить название или ID — покажутся до 10 совпадений<br>'
+                    + '<span class="text-xs text-gray-600">Всего в базе: ' + arr.length.toLocaleString('ru') + ' предметов</span>'
                     + '</div>';
-            });
-            if (filtered.length > 300) {
-                grid.innerHTML += '<div class="w-full text-center text-gray-500 py-4 font-bold mt-4">Показано 300 из ' + filtered.length + '. Уточните поиском.</div>';
+                return;
+            }
+
+            // Фильтр (стримом, чтобы не build весь массив для 87k items)
+            const LIMIT = 10;
+            const matches = [];
+            for (let i = 0; i < arr.length; i++) {
+                const it = arr[i];
+                if (mod !== 'ALL' && it.mod_id !== mod) continue;
+                if (search) {
+                    const n = (it.name || '').toLowerCase();
+                    const id = (it.id || '').toLowerCase();
+                    if (!n.includes(search) && !id.includes(search)) continue;
+                }
+                matches.push(it);
+                if (matches.length >= LIMIT + 1) break;  // +1 чтобы знать «есть ещё»
+            }
+
+            if (!matches.length) {
+                grid.innerHTML = '<div class="w-full text-center text-gray-500 py-8 font-bold">Ничего не найдено</div>';
+                return;
+            }
+
+            const hasMore = matches.length > LIMIT;
+            const view = matches.slice(0, LIMIT);
+            const list = document.createElement('div');
+            list.className = 'w-full max-w-3xl mx-auto flex flex-col gap-2';
+            for (const it of view) {
+                const imgUrl = it.icon ? ('./item_icons/' + it.icon) : casinoGetIconUrl(it.id, it.metadata);
+                const safeName = (it.name || 'Неизвестно').replace(/"/g, '&quot;');
+                const dmg = it.metadata ?? 0;
+                const row = document.createElement('div');
+                row.className = 'flex items-center gap-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-pink-500 rounded-lg p-3 cursor-pointer transition';
+                row.innerHTML =
+                    '<div class="w-10 h-10 bg-gray-900 rounded flex items-center justify-center shrink-0">'
+                  + '  <img src="' + imgUrl + '" loading="lazy" class="max-w-[80%] max-h-[80%] object-contain pixelated" onerror="this.src=\'' + casinoGetIconUrl('none',0) + '\'">'
+                  + '</div>'
+                  + '<div class="flex-1 min-w-0">'
+                  + '  <div class="text-white font-medium truncate">' + neiEsc(safeName) + '</div>'
+                  + '  <div class="mono text-[11px] text-blue-300 truncate">' + neiEsc(it.id || '') + ':' + dmg + (it.mod_id ? '  <span class="text-amber-400 ml-2">' + neiEsc(it.mod_id) + '</span>' : '') + '</div>'
+                  + '</div>'
+                  + '<div class="text-pink-400 text-2xl shrink-0">→</div>';
+                const esc = safeName.replace(/'/g, "\\'");
+                row.addEventListener('click', () => casinoSelectCatalogItem(it.id, dmg, esc));
+                list.appendChild(row);
+            }
+            grid.appendChild(list);
+            if (hasMore) {
+                const more = document.createElement('div');
+                more.className = 'w-full text-center text-gray-500 mt-3 text-xs';
+                more.textContent = 'Показано ' + LIMIT + ' первых совпадений — уточните поиск';
+                grid.appendChild(more);
             }
         }
         window.casinoSelectCatalogItem = function(id, dmg, name) {
