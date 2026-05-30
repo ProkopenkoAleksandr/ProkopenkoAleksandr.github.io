@@ -1987,6 +1987,8 @@
             chart: null,
             initialized: false,
             catalogTargetItemIdx: null,
+            catalogPage: 1,
+            catalogPageSize: 20,
         };
 
         async function casinoInit() {
@@ -2012,8 +2014,12 @@
                 casinoRenderLogs(); casinoUpdateAnalytics();
             });
 
-            document.getElementById('casino-cat-search').addEventListener('input', casinoRenderCatalogItems);
-            document.getElementById('casino-cat-mod').addEventListener('change', casinoRenderCatalogItems);
+            document.getElementById('casino-cat-search').addEventListener('input', () => {
+                window.CASINO.catalogPage = 1; casinoRenderCatalogItems();
+            });
+            document.getElementById('casino-cat-mod').addEventListener('change', () => {
+                window.CASINO.catalogPage = 1; casinoRenderCatalogItems();
+            });
 
             // Подтягиваем каталог NEI (если ещё не загружен), чтобы «Выбрать из базы» работал
             try {
@@ -2105,6 +2111,7 @@
         // JSON грузится в фоне; пока не загружен — поиск пишет «загрузка».
         window.casinoOpenCatalog = function(itemIdx) {
             window.CASINO.catalogTargetItemIdx = itemIdx;
+            window.CASINO.catalogPage = 1;
             document.getElementById('casino-catalog-modal').classList.remove('hidden');
             const search = document.getElementById('casino-cat-search');
             search.value = '';
@@ -2140,34 +2147,38 @@
 
             const arr = (window.NEI && window.NEI.all) ? window.NEI.all : [];
 
-            // База ещё грузится
             if (!arr.length) {
                 grid.innerHTML = '<div class="w-full text-center text-gray-400 py-8 font-bold">⏳ Загрузка базы (~14 МБ)…</div>';
                 return;
             }
 
-            // Подсказка пока пользователь не ввёл запрос
             if (!search && mod === 'ALL') {
                 grid.innerHTML = '<div class="w-full text-center text-gray-500 py-8 text-sm">'
-                    + '🔍 Начни вводить название или ID — покажутся до 10 совпадений<br>'
+                    + '🔍 Начни вводить название или ID<br>'
                     + '<span class="text-xs text-gray-600">Всего в базе: ' + arr.length.toLocaleString('ru') + ' предметов</span>'
                     + '</div>';
                 return;
             }
 
-            // Фильтр (стримом, чтобы не build весь массив для 87k items)
-            const LIMIT = 10;
+            // === Фильтрация + ранжирование ===
+            // score: 0 = точное совпадение, 1 = startsWith, 2 = слово начинается с запроса, 3 = substring
             const matches = [];
             for (let i = 0; i < arr.length; i++) {
                 const it = arr[i];
                 if (mod !== 'ALL' && it.mod_id !== mod) continue;
+                let score = -1;
                 if (search) {
                     const n = (it.name || '').toLowerCase();
                     const id = (it.id || '').toLowerCase();
-                    if (!n.includes(search) && !id.includes(search)) continue;
+                    if (n === search || id === search) score = 0;
+                    else if (n.startsWith(search) || id.startsWith(search)) score = 1;
+                    else if ((' ' + n).includes(' ' + search)) score = 2;  // начало слова
+                    else if (n.includes(search) || id.includes(search)) score = 3;
+                    else continue;
+                } else {
+                    score = 0;  // фильтр только по моду
                 }
-                matches.push(it);
-                if (matches.length >= LIMIT + 1) break;  // +1 чтобы знать «есть ещё»
+                matches.push({ it: it, score: score });
             }
 
             if (!matches.length) {
@@ -2175,22 +2186,43 @@
                 return;
             }
 
-            const hasMore = matches.length > LIMIT;
-            const view = matches.slice(0, LIMIT);
+            // Сортируем по score, потом по длине имени (точное короче) для стабильности
+            matches.sort((a, b) => {
+                if (a.score !== b.score) return a.score - b.score;
+                return (a.it.name || '').length - (b.it.name || '').length;
+            });
+
+            // === Пагинация ===
+            const total = matches.length;
+            const pageSize = window.CASINO.catalogPageSize || 20;
+            const totalPages = Math.max(1, Math.ceil(total / pageSize));
+            if (window.CASINO.catalogPage > totalPages) window.CASINO.catalogPage = totalPages;
+            const page = window.CASINO.catalogPage;
+            const from = (page - 1) * pageSize;
+            const to = Math.min(from + pageSize, total);
+            const view = matches.slice(from, to);
+
             const list = document.createElement('div');
             list.className = 'w-full max-w-3xl mx-auto flex flex-col gap-2';
-            for (const it of view) {
+            for (const m of view) {
+                const it = m.it;
                 const imgUrl = it.icon ? ('./item_icons/' + it.icon) : casinoGetIconUrl(it.id, it.metadata);
                 const safeName = (it.name || 'Неизвестно').replace(/"/g, '&quot;');
                 const dmg = it.metadata ?? 0;
                 const row = document.createElement('div');
                 row.className = 'flex items-center gap-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-pink-500 rounded-lg p-3 cursor-pointer transition';
+                // подсветка score для отладки/наглядности
+                const scoreBadge = m.score === 0
+                    ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-900/50 text-green-300 border border-green-700/50 ml-2 shrink-0">точно</span>'
+                    : m.score === 1
+                    ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-900/50 text-blue-300 border border-blue-700/50 ml-2 shrink-0">с начала</span>'
+                    : '';
                 row.innerHTML =
                     '<div class="w-10 h-10 bg-gray-900 rounded flex items-center justify-center shrink-0">'
                   + '  <img src="' + imgUrl + '" loading="lazy" class="max-w-[80%] max-h-[80%] object-contain pixelated" onerror="this.src=\'' + casinoGetIconUrl('none',0) + '\'">'
                   + '</div>'
                   + '<div class="flex-1 min-w-0">'
-                  + '  <div class="text-white font-medium truncate">' + neiEsc(safeName) + '</div>'
+                  + '  <div class="flex items-center"><span class="text-white font-medium truncate">' + neiEsc(safeName) + '</span>' + scoreBadge + '</div>'
                   + '  <div class="mono text-[11px] text-blue-300 truncate">' + neiEsc(it.id || '') + ':' + dmg + (it.mod_id ? '  <span class="text-amber-400 ml-2">' + neiEsc(it.mod_id) + '</span>' : '') + '</div>'
                   + '</div>'
                   + '<div class="text-pink-400 text-2xl shrink-0">→</div>';
@@ -2199,24 +2231,49 @@
                 list.appendChild(row);
             }
             grid.appendChild(list);
-            if (hasMore) {
-                const more = document.createElement('div');
-                more.className = 'w-full text-center text-gray-500 mt-3 text-xs';
-                more.textContent = 'Показано ' + LIMIT + ' первых совпадений — уточните поиск';
-                grid.appendChild(more);
-            }
+
+            // === Пагинатор ===
+            const pager = document.createElement('div');
+            pager.className = 'w-full max-w-3xl mx-auto flex items-center justify-center gap-2 mt-4 flex-wrap';
+            const mkBtn = (label, disabled, onClick) => {
+                const b = document.createElement('button');
+                b.textContent = label;
+                b.disabled = disabled;
+                b.className = 'bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm font-medium px-3 py-1.5 rounded transition disabled:opacity-40 disabled:cursor-default';
+                if (!disabled) b.addEventListener('click', onClick);
+                return b;
+            };
+            pager.append(mkBtn('« первая', page <= 1, () => { window.CASINO.catalogPage = 1; casinoRenderCatalogItems(); }));
+            pager.append(mkBtn('‹ назад',  page <= 1, () => { window.CASINO.catalogPage--;   casinoRenderCatalogItems(); }));
+            const info = document.createElement('span');
+            info.className = 'text-sm text-gray-400 tabular px-3';
+            info.textContent = (from + 1) + '–' + to + ' из ' + total + ' • стр. ' + page + '/' + totalPages;
+            pager.append(info);
+            pager.append(mkBtn('вперёд ›', page >= totalPages, () => { window.CASINO.catalogPage++;     casinoRenderCatalogItems(); }));
+            pager.append(mkBtn('последняя »', page >= totalPages, () => { window.CASINO.catalogPage = totalPages; casinoRenderCatalogItems(); }));
+            grid.appendChild(pager);
         }
         window.casinoSelectCatalogItem = function(id, dmg, name) {
+            // подбираем min_price из NEI (если есть) для дефолтной цены слота
+            const neiArr = (window.NEI && window.NEI.all) ? window.NEI.all : [];
+            const neiItem = neiArr.find(x => x.id === id && (Number(x.metadata) || 0) === Number(dmg));
+            const defaultPrice = (neiItem && neiItem.min_price != null) ? neiItem.min_price : 10;
+
             if (window.CASINO.catalogTargetItemIdx === null) {
                 const c = window.CASINO.cases[window.CASINO.editingIdx];
                 if (!c.items) c.items = [];
-                c.items.push({ name: name, id: id, damage: dmg, price: 10, chance: 10, qty: 1 });
+                c.items.push({ name: name, id: id, damage: dmg, price: defaultPrice, chance: 10, qty: 1 });
                 casinoRenderCaseEditor(window.CASINO.editingIdx);
             } else {
                 const i = window.CASINO.catalogTargetItemIdx;
                 document.getElementById('ed-name-' + i).value = name;
                 document.getElementById('ed-id-' + i).value = id;
                 document.getElementById('ed-damage-' + i).value = dmg;
+                // если поле цены сейчас пустое или 0 — тоже подставим минималку
+                const priceEl = document.getElementById('ed-price-' + i);
+                if (priceEl && (priceEl.value === '' || Number(priceEl.value) === 0)) {
+                    priceEl.value = defaultPrice;
+                }
                 casinoUpdateIconPreview(i);
             }
             casinoCloseCatalog();
