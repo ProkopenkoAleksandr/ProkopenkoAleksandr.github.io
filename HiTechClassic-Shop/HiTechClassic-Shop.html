@@ -255,7 +255,7 @@
                         <div class="w-32">Мод</div>
                         <div class="w-12 text-right">Meta</div>
                         <div class="w-24 text-right">Мин. цена</div>
-                        <div class="w-[120px] text-center">Магазин</div>
+                        <div class="w-[130px] text-center">Действия</div>
                     </div>
                     <div id="nei-rows" class="divide-y divide-gray-700">
                         <div class="p-6 text-center text-gray-500 text-sm">Откройте вкладку — каталог загрузится автоматически.</div>
@@ -317,6 +317,41 @@
                     </div>
                     <div id="crafter-list" class="divide-y divide-gray-700">
                         <div class="p-6 text-center text-gray-500 text-sm">Загрузка…</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Модалка выбора кейса для добавления предмета из NEI -->
+            <div id="nei-case-picker-modal" class="hidden fixed inset-0 bg-black/80 z-[150] flex items-center justify-center backdrop-blur-sm p-4">
+                <div class="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+                    <div class="bg-gray-800 px-5 py-4 border-b border-gray-700 flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-white">🎰 Добавить в кейс</h3>
+                        <button onclick="neiCloseCasePicker()" class="text-gray-400 hover:text-white text-xl">✕</button>
+                    </div>
+                    <div class="p-4 sm:p-5 overflow-y-auto custom-scrollbar">
+                        <div id="nei-case-picker-item" class="mb-4 p-3 bg-gray-800 rounded border border-gray-700 flex items-center gap-3">
+                            <img id="nei-case-picker-icon" src="" alt="" class="item-icon">
+                            <div class="flex-1 min-w-0">
+                                <div id="nei-case-picker-name" class="text-white font-bold truncate">—</div>
+                                <div id="nei-case-picker-id" class="mono text-xs text-blue-300 truncate">—</div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-3 mb-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Цена слота</label>
+                                <input type="number" id="nei-case-picker-price" value="10" class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-yellow-400 font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Кол-во</label>
+                                <input type="number" id="nei-case-picker-qty" value="1" min="1" class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Шанс (%)</label>
+                                <input type="number" step="0.001" id="nei-case-picker-chance" value="10" class="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-blue-300 font-mono">
+                            </div>
+                        </div>
+                        <div class="text-xs uppercase tracking-wider text-gray-400 mb-2">Выбери кейс:</div>
+                        <div id="nei-case-picker-list" class="space-y-2"></div>
                     </div>
                 </div>
             </div>
@@ -1263,6 +1298,84 @@
             });
         };
 
+        // === Добавление предмета в кейс казино из NEI ===
+        window.neiAddToCasinoCase = async function(payloadB64) {
+            const x = JSON.parse(decodeURIComponent(escape(atob(payloadB64))));
+            // подгружаем кейсы если казино ещё не открывали
+            if (!window.CASINO.initialized) {
+                try { await casinoInit(); } catch (e) { console.error(e); }
+            }
+            // если кейсов нет — предложить создать
+            if (!window.CASINO.cases || !window.CASINO.cases.length) {
+                if (confirm('Кейсов пока нет. Создать новый?')) {
+                    window.casinoCreateNewCase();
+                    showToast('Кейс создан — открой "Казино → Кейсы" чтобы настроить', 'success');
+                }
+                return;
+            }
+            // заполняем модалку
+            document.getElementById('nei-case-picker-icon').src = x.icon ? ('./item_icons/' + x.icon) : casinoGetIconUrl(x.id, x.metadata);
+            document.getElementById('nei-case-picker-name').textContent = x.name || x.id;
+            document.getElementById('nei-case-picker-id').textContent = (x.id || '') + ':' + (x.metadata ?? 0);
+            document.getElementById('nei-case-picker-price').value = (x.min_price != null) ? Math.max(1, Math.floor(x.min_price)) : 10;
+            document.getElementById('nei-case-picker-qty').value = 1;
+            document.getElementById('nei-case-picker-chance').value = 10;
+            // строим список кейсов
+            const list = document.getElementById('nei-case-picker-list');
+            list.innerHTML = '';
+            window.CASINO.cases.forEach((c, idx) => {
+                if (!c) return;
+                const count = (c.items || []).length;
+                const btn = document.createElement('button');
+                btn.className = 'w-full text-left bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-pink-500 rounded-lg p-3 transition flex items-center justify-between';
+                btn.innerHTML = '<div><div class="font-bold text-white">' + neiEsc(c.name || '?') + '</div>'
+                    + '<div class="text-xs text-gray-400">Цена ' + (c.price || 0) + ' ЭМ • Предметов: ' + count + '</div></div>'
+                    + '<div class="text-pink-400 text-2xl">→</div>';
+                btn.addEventListener('click', () => neiConfirmAddToCase(idx, x));
+                list.appendChild(btn);
+            });
+            // и кнопка «создать новый»
+            const addNew = document.createElement('button');
+            addNew.className = 'w-full bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white border border-green-500/50 hover:border-green-500 rounded-lg p-3 transition font-bold';
+            addNew.textContent = '+ Создать новый кейс и добавить туда';
+            addNew.addEventListener('click', () => {
+                window.CASINO.cases.push({ name: 'Новый кейс', price: 100, items: [] });
+                neiConfirmAddToCase(window.CASINO.cases.length - 1, x);
+            });
+            list.appendChild(addNew);
+            document.getElementById('nei-case-picker-modal').classList.remove('hidden');
+        };
+
+        function neiConfirmAddToCase(caseIdx, x) {
+            const price = Number(document.getElementById('nei-case-picker-price').value);
+            const qty = Math.max(1, Number(document.getElementById('nei-case-picker-qty').value) || 1);
+            const chance = Number(document.getElementById('nei-case-picker-chance').value);
+            if (!Number.isFinite(price) || price < 0) { showToast('Некорректная цена', 'error'); return; }
+            if (!Number.isFinite(chance) || chance <= 0) { showToast('Некорректный шанс', 'error'); return; }
+            const c = window.CASINO.cases[caseIdx];
+            if (!c) { showToast('Кейс не найден', 'error'); return; }
+            if (!c.items) c.items = [];
+            c.items.push({
+                name: x.name || x.id,
+                id: x.id || '',
+                damage: x.metadata ?? 0,
+                price: price,
+                qty: qty,
+                chance: chance,
+            });
+            db.ref(CASINO_DB_PATH + '/data/cases').set(window.CASINO.cases)
+                .then(() => {
+                    showToast('Добавлено в «' + (c.name || '?') + '»', 'success');
+                    neiLog('КЕЙС ДОБАВЛЕН ПРЕДМЕТ', '«' + (x.name || x.id) + '» → «' + (c.name || '?') + '» (цена=' + price + ', шанс=' + chance + '%, x' + qty + ')');
+                    neiCloseCasePicker();
+                })
+                .catch(e => { console.error(e); showToast('Ошибка БД', 'error'); });
+        }
+
+        window.neiCloseCasePicker = function() {
+            document.getElementById('nei-case-picker-modal').classList.add('hidden');
+        };
+
         window.neiRemoveFromCrafter = function(index, name) {
             if (!confirm('Убрать из автокрафта: ' + name + '?')) return;
             db.ref('crafter').once('value').then((snap) => {
@@ -1692,7 +1805,11 @@
                   + 'class="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium py-1 px-2 rounded transition">'
                   + '+ Крафт</button>';
 
-            const btn = '<div class="flex flex-col gap-1 w-full">' + btnShop + btnCrafter + '</div>';
+            const btnCasino = '<button onclick="neiAddToCasinoCase(\'' + payload + '\')" '
+                + 'class="w-full bg-pink-600 hover:bg-pink-700 text-white text-xs font-medium py-1 px-2 rounded transition">'
+                + '🎰 В кейс</button>';
+
+            const btn = '<div class="flex flex-col gap-1 w-full">' + btnShop + btnCrafter + btnCasino + '</div>';
 
             const rowBg = (inShop && inCrafter) ? 'bg-purple-900/10'
                         : inShop                ? 'bg-green-900/10'
@@ -1715,7 +1832,7 @@
                 + '<div class="mono tabular text-[11px] text-gray-400">' + meta + '</div></div>'
                 + '<div class="md:w-24 md:text-right"><div class="md:hidden text-[10px] uppercase text-gray-500 mb-0.5">Мин. цена</div>'
                 + '<div class="tabular ' + priceClass + '">' + priceText + '</div></div>'
-                + '<div class="md:w-[120px] flex-none">' + btn + '</div>'
+                + '<div class="md:w-[130px] flex-none">' + btn + '</div>'
                 + '</div>';
         }
 
@@ -1865,7 +1982,7 @@
             catalogTargetItemIdx: null,
         };
 
-        function casinoInit() {
+        async function casinoInit() {
             if (window.CASINO.initialized) return;
             window.CASINO.initialized = true;
 
@@ -1888,10 +2005,18 @@
                 casinoRenderLogs(); casinoUpdateAnalytics();
             });
 
-            // Заполняем модов для фильтра каталога (из NEI данных, если загружены)
-            casinoFillCatalogModFilter();
             document.getElementById('casino-cat-search').addEventListener('input', casinoRenderCatalogItems);
             document.getElementById('casino-cat-mod').addEventListener('change', casinoRenderCatalogItems);
+
+            // Подтягиваем каталог NEI (если ещё не загружен), чтобы «Выбрать из базы» работал
+            try {
+                await neiInitOnce();
+            } catch (e) { console.warn('NEI каталог не загрузился:', e); }
+            casinoFillCatalogModFilter();
+            // если каталог-модалка уже открыта — перерисовать
+            if (!document.getElementById('casino-catalog-modal').classList.contains('hidden')) {
+                casinoRenderCatalogItems();
+            }
         }
 
         function casinoSwitchSubTab(sub) {
