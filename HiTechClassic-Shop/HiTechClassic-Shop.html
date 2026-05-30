@@ -312,6 +312,7 @@
                         <div class="flex-1 min-w-0">Название</div>
                         <div class="w-52 min-w-0">ID</div>
                         <div class="w-16 text-right">Мета</div>
+                        <div class="w-20 text-right">В МЭ</div>
                         <div class="w-24">Хранить</div>
                         <div class="w-24">Заказ по</div>
                         <div class="w-16 text-center">Вкл</div>
@@ -789,6 +790,19 @@
                 window.CRAFTER_STATUS = snap.val() || null;
                 renderCrafterStatus();
             });
+
+            // ME-СНАПШОТ — нужен и для вкладки «МЭ Склад», и для колонки «В МЭ» в Автокрафте.
+            // Подписка глобальная (не только при открытии вкладки), чтобы данные были всегда.
+            window.MESTORE = window.MESTORE || {
+                snap: null, search: '', sort: 'size_desc', page: 1, pageSize: 100, initialized: false
+            };
+            db.ref('me_snapshot').on('value', (snap) => {
+                window.MESTORE.snap = snap.val();
+                window.MESTORE._neiIndex = null;  // forces rebuild при следующем рендере
+                // обновляем оба возможных потребителя
+                if (typeof crafterRender === 'function' && window.CRAFTER && window.CRAFTER.initialized) crafterRender();
+                if (typeof mestoreRender === 'function') mestoreRender();
+            });
             // и обновляем «свежесть» статуса каждые 5 сек (показываем offline если давно нет апдейтов)
             setInterval(renderCrafterStatus, 5000);
 
@@ -1093,6 +1107,18 @@
                 list.innerHTML = '<div class="p-6 text-center text-gray-500 text-sm">Ничего не найдено</div>';
                 return;
             }
+
+            // === Построим Map текущих стоков из /me_snapshot для колонки «В МЭ» ===
+            const meMap = new Map();
+            const meSnap = (window.MESTORE && window.MESTORE.snap) ? window.MESTORE.snap : null;
+            if (meSnap && Array.isArray(meSnap.items)) {
+                for (const x of meSnap.items) {
+                    const k = (x.id || '') + '|' + (Number(x.damage) || 0);
+                    meMap.set(k, x.size || 0);
+                }
+            }
+            const hasMeSnap = meMap.size > 0;
+
             const parts = [];
             for (const p of arr) {
                 const it = p.item;
@@ -1102,6 +1128,21 @@
                     ? '<img loading="lazy" src="./item_icons/' + neiEscAttr(it.icon) + '" alt="" class="item-icon">'
                     : '<div class="item-icon-empty">—</div>';
                 const nameVal = (it.name || '').replace(/"/g, '&quot;');
+
+                // Stock из МЭ — если есть snapshot
+                let stockHtml;
+                if (!hasMeSnap) {
+                    stockHtml = '<span class="text-gray-600">—</span>';
+                } else {
+                    const stockKey = (it.id || '') + '|' + (Number(it.damage) || 0);
+                    const stock = meMap.get(stockKey) || 0;
+                    const keep = Number(it.keep_amount) || 0;
+                    let cls = 'text-green-400';
+                    if (stock === 0) cls = 'text-red-400 font-bold';
+                    else if (keep > 0 && stock < keep) cls = 'text-yellow-400';
+                    stockHtml = '<span class="tabular ' + cls + '">' + Number(stock).toLocaleString('ru') + '</span>';
+                }
+
                 parts.push(
                     '<div class="px-4 py-3 flex flex-col md:flex-row md:items-center gap-3 md:gap-4 hover:bg-gray-750 transition ' + (enabled ? '' : 'opacity-50') + '">'
                   + '  <div class="w-12 flex-none">' + icon + '</div>'
@@ -1116,6 +1157,10 @@
                   + '  <div class="md:w-16 md:text-right">'
                   + '    <div class="md:hidden text-[10px] uppercase text-gray-500 mb-0.5">Мета</div>'
                   + '    <div class="mono tabular text-[11px] text-gray-400">' + (it.damage ?? 0) + '</div>'
+                  + '  </div>'
+                  + '  <div class="md:w-20 md:text-right">'
+                  + '    <div class="md:hidden text-[10px] uppercase text-gray-500 mb-0.5">В МЭ</div>'
+                  + '    ' + stockHtml
                   + '  </div>'
                   + '  <div class="w-full md:w-24">'
                   + '    <label class="text-xs text-gray-400 block md:hidden mb-1">Хранить</label>'
@@ -2981,11 +3026,17 @@
         function mestoreInit() {
             if (window.MESTORE.initialized) return;
             window.MESTORE.initialized = true;
-            db.ref('me_snapshot').on('value', (snap) => {
-                window.MESTORE.snap = snap.val();
-                mestoreRender();
-            });
+            // Подписка на /me_snapshot теперь делается в loadData() — здесь только UI.
             setInterval(mestoreUpdateFreshness, 5000);
+            mestoreRender();  // если данные уже есть — отрисовать сразу
+
+            // подтягиваем каталог NEI в фоне для русских названий и иконок
+            if (!window.NEI || !window.NEI.all || !window.NEI.all.length) {
+                neiInitOnce().then(() => {
+                    window.MESTORE._neiIndex = null;  // forces rebuild
+                    mestoreRender();
+                }).catch(() => {});
+            }
 
             let to;
             document.getElementById('mestore-search').addEventListener('input', (e) => {
@@ -3049,22 +3100,42 @@
             document.getElementById('mestore-updated').textContent = s.updated_at || '—';
             mestoreUpdateFreshness();
 
-            // фильтр + сортировка
+            // фильтр + сортировка. Сначала склеиваем с NEI-каталогом, чтобы знать русские имена.
+            const neiAllPre = (window.NEI && window.NEI.all) ? window.NEI.all : null;
+            // Индекс NEI по ключу id|damage для быстрого поиска
+            if (neiAllPre && !window.MESTORE._neiIndex) {
+                window.MESTORE._neiIndex = new Map();
+                for (const x of neiAllPre) {
+                    const k = (x.id || '') + '|' + (Number(x.metadata) || 0);
+                    if (!window.MESTORE._neiIndex.has(k)) window.MESTORE._neiIndex.set(k, x);
+                }
+            }
+            const neiIdx = window.MESTORE._neiIndex;
+            const getRu = (it) => {
+                if (!neiIdx) return null;
+                const k = (it.id || '') + '|' + (Number(it.damage) || 0);
+                const f = neiIdx.get(k);
+                return f ? f.name : null;
+            };
+
             const q = window.MESTORE.search;
             let arr = s.items;
             if (q) {
                 arr = arr.filter(it => {
                     const l = (it.label || '').toLowerCase();
                     const id = (it.id || '').toLowerCase();
-                    return l.includes(q) || id.includes(q);
+                    const ru = (getRu(it) || '').toLowerCase();
+                    return l.includes(q) || id.includes(q) || ru.includes(q);
                 });
             }
             arr = arr.slice();
+            // для сортировки тоже берём русское имя если есть
+            const dispName = (it) => getRu(it) || it.label || '';
             switch (window.MESTORE.sort) {
                 case 'size_desc': arr.sort((a,b) => (b.size||0) - (a.size||0)); break;
                 case 'size_asc':  arr.sort((a,b) => (a.size||0) - (b.size||0)); break;
-                case 'name_asc':  arr.sort((a,b) => (a.label||'').localeCompare(b.label||'','ru')); break;
-                case 'name_desc': arr.sort((a,b) => (b.label||'').localeCompare(a.label||'','ru')); break;
+                case 'name_asc':  arr.sort((a,b) => dispName(a).localeCompare(dispName(b),'ru')); break;
+                case 'name_desc': arr.sort((a,b) => dispName(b).localeCompare(dispName(a),'ru')); break;
                 case 'id_asc':    arr.sort((a,b) => (a.id||'').localeCompare(b.id||'')); break;
             }
 
@@ -3086,16 +3157,21 @@
                 for (let i = from; i < to; i++) {
                     const it = arr[i];
                     let iconHtml = '<div class="item-icon-empty">—</div>';
+                    let displayName = it.label || it.id || '?';
                     if (neiAll) {
                         const found = neiAll.find(x => x.id === it.id && (Number(x.metadata) || 0) === Number(it.damage || 0));
-                        if (found && found.icon) {
-                            iconHtml = '<img loading="lazy" src="./item_icons/' + neiEscAttr(found.icon) + '" alt="" class="item-icon">';
+                        if (found) {
+                            // приоритет русского названия из NEI каталога над label из OC
+                            if (found.name) displayName = found.name;
+                            if (found.icon) {
+                                iconHtml = '<img loading="lazy" src="./item_icons/' + neiEscAttr(found.icon) + '" alt="" class="item-icon">';
+                            }
                         }
                     }
                     parts.push(
                         '<div class="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 px-4 py-2.5 hover:bg-gray-750 transition">'
                       + '<div class="w-12 flex-none">' + iconHtml + '</div>'
-                      + '<div class="flex-1 min-w-0"><div class="text-white truncate">' + neiEsc(it.label || it.id || '?') + '</div></div>'
+                      + '<div class="flex-1 min-w-0"><div class="text-white truncate">' + neiEsc(displayName) + '</div></div>'
                       + '<div class="md:w-64 min-w-0 mono text-[11px] text-blue-300 truncate">' + neiEsc(it.id || '') + '</div>'
                       + '<div class="md:w-12 md:text-right mono tabular text-[11px] text-gray-400">' + (it.damage ?? 0) + '</div>'
                       + '<div class="md:w-28 md:text-right tabular text-green-400 font-bold">' + Number(it.size || 0).toLocaleString('ru') + '</div>'
