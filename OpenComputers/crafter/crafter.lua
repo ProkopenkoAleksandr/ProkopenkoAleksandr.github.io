@@ -296,6 +296,19 @@ local function countActive()
     return n
 end
 
+-- Возвращает unix-timestamp в миллисекундах (UTC)
+local function getRealTimeMs()
+    local tmp = "/home/HostTime.tmp"
+    local f = io.open(tmp, "w")
+    if f then
+        f:write(""); f:close()
+        local lm = fs.lastModified(tmp)
+        fs.remove(tmp)
+        if lm and lm > 0 then return lm end
+    end
+    return nil
+end
+
 -- =========================================================
 -- ПУБЛИКАЦИЯ СТАТУСА В FIREBASE /crafter_status
 -- =========================================================
@@ -312,6 +325,7 @@ local function sendHeartbeat(force)
         name = "Автокрафтер",
         type = "crafter",
         last_seen = getRealTime(),
+        last_seen_ms = getRealTimeMs(),
         started_at = startedAt,
         paused = paused,
         active_count = countActive(),
@@ -616,7 +630,9 @@ local function handleClick(id)
         pcall(function()
             network.put("/heartbeats/crafter", json.encode({
                 name = "Автокрафтер", type = "crafter",
-                last_seen = getRealTime(), started_at = startedAt,
+                last_seen = getRealTime(),
+                last_seen_ms = getRealTimeMs(),
+                started_at = startedAt,
                 stopped = true,
             }))
         end)

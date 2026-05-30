@@ -58,24 +58,46 @@ local function getRealTime()
 end
 
 -- Heartbeat для дашборда. Шлёт компактный snapshot статуса в /heartbeats/me_snapshot
+local heartbeatOkPrintedOnce = false
 sendHeartbeat = function(stopped)
-    if not config.use_database then return end
-    if not config.firebase_url or config.firebase_url == "" or config.firebase_url == "заменить" then return end
-    if not component.isAvailable("internet") then return end
+    if not config.use_database then
+        if not heartbeatOkPrintedOnce then print("[heartbeat] config.use_database = false, пропуск"); heartbeatOkPrintedOnce = true end
+        return
+    end
+    if not config.firebase_url or config.firebase_url == "" or config.firebase_url == "заменить" then
+        print("[heartbeat] firebase_url не настроен в /home/config.lua")
+        return
+    end
+    if not component.isAvailable("internet") then
+        print("[heartbeat] Internet Card не найдена")
+        return
+    end
     if not startedAt then startedAt = getRealTime() end
-    pcall(function()
-        network.put("/heartbeats/me_snapshot", json.encode({
-            name = "ME-Snapshot",
-            type = "me_snapshot",
-            last_seen = getRealTime(),
-            started_at = startedAt,
-            interval = INTERVAL,
-            last_unique = lastUnique,
-            last_total = lastTotal,
-            last_bytes = lastBytes,
-            stopped = stopped or false,
-        }))
-    end)
+    -- UTC unix-ms через тот же файловый трюк что в getRealTime
+    local lastSeenMs = nil
+    do
+        local tmp = "/home/HostTime.tmp"
+        local f = io.open(tmp, "w")
+        if f then f:write(""); f:close(); lastSeenMs = fs.lastModified(tmp); fs.remove(tmp) end
+    end
+    local ok, res = network.put("/heartbeats/me_snapshot", json.encode({
+        name = "ME-Snapshot",
+        type = "me_snapshot",
+        last_seen = getRealTime(),
+        last_seen_ms = lastSeenMs,
+        started_at = startedAt,
+        interval = INTERVAL,
+        last_unique = lastUnique,
+        last_total = lastTotal,
+        last_bytes = lastBytes,
+        stopped = stopped or false,
+    }))
+    if not ok then
+        print("[heartbeat] FAIL: " .. tostring(res))
+    elseif not heartbeatOkPrintedOnce then
+        print("[heartbeat] OK — отправлено в /heartbeats/me_snapshot")
+        heartbeatOkPrintedOnce = true
+    end
 end
 
 -- Логирование ТОЛЬКО в Firebase /logs.
@@ -179,6 +201,9 @@ print("Источник:    Firebase /me_snapshot")
 print("Закрытие:    Ctrl+Alt+C")
 print()
 logToFile("СТАРТ interval=" .. INTERVAL .. "s, min_size=" .. MIN_SIZE .. ", max=" .. MAX_ITEMS)
+
+-- Первый heartbeat сразу, чтобы дашборд показал ON-статус не через 60 сек, а сразу
+sendHeartbeat()
 
 local iter = 0
 while true do

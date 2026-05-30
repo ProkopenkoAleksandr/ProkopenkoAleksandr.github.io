@@ -38,6 +38,7 @@
         @keyframes casinoFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .casino-fade-in { animation: casinoFadeIn 0.3s ease-out forwards; }
         .casino-subtab-btn.active { background-color: #1f2937; color: #fff; }
+        .shop-subtab-btn.active { background-color: #1f2937; color: #fff; }
         /* старые правила сайта ниже */
     </style>
     <style>
@@ -98,9 +99,8 @@
                     <div class="flex items-center">
                         <span class="text-xl font-bold text-blue-400 mr-4">МЭ Магазин</span>
                         <div class="hidden sm:flex space-x-2">
-                            <button onclick="switchTab('dashboard')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-dashboard">📊 Дашборд</button>
-                            <button onclick="switchTab('users')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium bg-gray-900 text-white" id="tab-users">Игроки</button>
-                            <button onclick="switchTab('shop')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-shop">Товары</button>
+                            <button onclick="switchTab('dashboard')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium bg-gray-900 text-white" id="tab-dashboard">📊 Дашборд</button>
+                            <button onclick="switchTab('shop')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-shop">🏪 Магазин</button>
                             <button onclick="switchTab('nei')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-nei">NEI</button>
                             <button onclick="switchTab('crafter')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-crafter">Автокрафт</button>
                             <button onclick="switchTab('mestore')" class="tab-btn px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-mestore">МЭ Склад</button>
@@ -114,9 +114,8 @@
                     </div>
                 </div>
                 <div class="sm:hidden pb-3 pt-1 flex space-x-2 overflow-x-auto no-scrollbar">
-                    <button onclick="switchTab('dashboard')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-dashboard-mob">📊</button>
-                    <button onclick="switchTab('users')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium bg-gray-900 text-white" id="tab-users-mob">Игроки</button>
-                    <button onclick="switchTab('shop')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-shop-mob">Товары</button>
+                    <button onclick="switchTab('dashboard')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium bg-gray-900 text-white" id="tab-dashboard-mob">📊</button>
+                    <button onclick="switchTab('shop')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-shop-mob">🏪 Магазин</button>
                     <button onclick="switchTab('nei')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-nei-mob">NEI</button>
                     <button onclick="switchTab('crafter')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-crafter-mob">Автокрафт</button>
                     <button onclick="switchTab('mestore')" class="tab-btn flex-none px-4 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition" id="tab-mestore-mob">МЭ Склад</button>
@@ -131,7 +130,7 @@
             <!-- ============================================================ -->
             <!-- ДАШБОРД                                                       -->
             <!-- ============================================================ -->
-            <div id="content-dashboard" class="tab-content hidden">
+            <div id="content-dashboard" class="tab-content block">
                 <div class="flex items-center justify-between mb-4 gap-4 flex-wrap">
                     <h2 class="text-2xl font-bold">Дашборд системы</h2>
                     <div id="dashboard-summary" class="text-sm text-gray-400">—</div>
@@ -141,18 +140,29 @@
                 </div>
             </div>
 
-            <div id="content-users" class="tab-content block">
-                <h2 class="text-2xl font-bold mb-4">Управление балансом</h2>
-                <div class="bg-gray-800 shadow rounded-lg overflow-hidden border border-gray-700">
-                    <div class="hidden sm:flex bg-gray-700 p-4 text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        <div class="flex-1">Никнейм</div>
-                        <div class="w-48 text-center">Баланс</div>
-                    </div>
-                    <div id="users-list" class="divide-y divide-gray-700"></div>
-                </div>
-            </div>
-
+            <!-- ============================================================ -->
+            <!-- МАГАЗИН (под-вкладки: Игроки / Товары)                       -->
+            <!-- ============================================================ -->
             <div id="content-shop" class="tab-content hidden">
+                <div class="mb-6 flex space-x-1 overflow-x-auto custom-scrollbar">
+                    <button onclick="shopSwitchSubTab('users')" class="shop-subtab-btn active px-4 py-2 rounded-lg text-sm font-semibold text-gray-400 hover:text-white hover:bg-gray-700 transition" data-sub="users">👥 Игроки</button>
+                    <button onclick="shopSwitchSubTab('items')" class="shop-subtab-btn px-4 py-2 rounded-lg text-sm font-semibold text-gray-400 hover:text-white hover:bg-gray-700 transition" data-sub="items">📦 Товары</button>
+                </div>
+
+                <!-- Игроки -->
+                <div id="shop-sub-users" class="shop-sub-content">
+                    <h2 class="text-2xl font-bold mb-4">Управление балансом</h2>
+                    <div class="bg-gray-800 shadow rounded-lg overflow-hidden border border-gray-700">
+                        <div class="hidden sm:flex bg-gray-700 p-4 text-xs font-medium text-gray-300 uppercase tracking-wider">
+                            <div class="flex-1">Никнейм</div>
+                            <div class="w-48 text-center">Баланс</div>
+                        </div>
+                        <div id="users-list" class="divide-y divide-gray-700"></div>
+                    </div>
+                </div>
+
+                <!-- Товары -->
+                <div id="shop-sub-items" class="shop-sub-content hidden">
                 <div class="flex items-center justify-between mb-4 gap-4 flex-wrap">
                     <h2 class="text-2xl font-bold">Товары на витрине</h2>
                     <div id="shop-stats" class="text-sm text-gray-400">—</div>
@@ -193,7 +203,8 @@
                     </div>
                     <div id="shop-list" class="divide-y divide-gray-700"></div>
                 </div>
-            </div>
+                </div> <!-- /shop-sub-items -->
+            </div> <!-- /content-shop -->
 
             <div id="content-nei" class="tab-content hidden">
                 <div class="flex items-center justify-between mb-4 gap-4 flex-wrap">
@@ -655,7 +666,9 @@
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('dashboard').classList.remove('hidden');
                 document.getElementById('user-email').innerText = user.email.replace('@shop.local', '');
-                loadData(); 
+                loadData();
+                // По умолчанию открываем Дашборд
+                switchTab('dashboard');
             } else {
                 document.getElementById('login-screen').classList.remove('hidden');
                 document.getElementById('dashboard').classList.add('hidden');
@@ -697,6 +710,23 @@
             if (tabId === 'casino') casinoInit();
             if (tabId === 'mestore') mestoreInit();
         }
+
+        // Магазин — переключение между Игроки / Товары
+        function shopSwitchSubTab(sub) {
+            document.querySelectorAll('.shop-sub-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.shop-subtab-btn').forEach(el => {
+                el.classList.remove('active', 'bg-gray-800', 'text-white');
+                el.classList.add('text-gray-400');
+            });
+            const target = document.getElementById('shop-sub-' + sub);
+            if (target) target.classList.remove('hidden');
+            const btn = document.querySelector('.shop-subtab-btn[data-sub="' + sub + '"]');
+            if (btn) {
+                btn.classList.add('active', 'bg-gray-800', 'text-white');
+                btn.classList.remove('text-gray-400');
+            }
+        }
+        window.shopSwitchSubTab = shopSwitchSubTab;
 
         function loadData() {
             // ПОЛЬЗОВАТЕЛИ
@@ -3243,7 +3273,11 @@
             const items = [];
             for (const id of ids) {
                 const h = hb[id] || {};
-                const ts = parseLogTime(h.last_seen) || 0;
+                // приоритет на last_seen_ms (UTC unix-ms из OC, без timezone-плясок).
+                // fallback на парсинг строки last_seen — может ошибаться из-за TZ.
+                let ts = 0;
+                if (h.last_seen_ms) ts = Number(h.last_seen_ms);
+                else if (h.last_seen) ts = parseLogTime(h.last_seen);
                 const ageSec = ts ? Math.floor((now - ts) / 1000) : 999999;
                 // OC-программы шлют heartbeat каждые 30 сек; >90 считаем тревогой, >180 — OFF
                 let state = 'on';

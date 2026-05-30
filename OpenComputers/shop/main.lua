@@ -90,6 +90,20 @@ local function getRealTime()
     return os.date("%Y-%m-%d %H:%M:%S") .. " (Игр.)"
 end
 
+-- Возвращает unix-timestamp в миллисекундах (UTC) — реальное серверное время.
+-- Браузер на дашборде сравнивает это с Date.now() напрямую, без timezone-плясок.
+local function getRealTimeMs()
+    local tmp = "/home/HostTime.tmp"
+    local f = io.open(tmp, "w")
+    if f then
+        f:write(""); f:close()
+        local lm = fs.lastModified(tmp)
+        fs.remove(tmp)
+        if lm and lm > 0 then return lm end
+    end
+    return nil
+end
+
 -- Heartbeat для дашборда. Шлёт компактный snapshot статуса в /heartbeats/shop.
 sendHeartbeat = function(stopped)
     if not (config.use_database and component.isAvailable("internet")) then return end
@@ -100,6 +114,7 @@ sendHeartbeat = function(stopped)
             name = "Магазин",
             type = "shop",
             last_seen = getRealTime(),
+            last_seen_ms = getRealTimeMs(),
             started_at = startedAt,
             shop_name = shop_name or "?",
             items_count = #shop_items,

@@ -13,7 +13,7 @@ config.db_secret = "заменить"
 config.currency_name = "ЭМ"
 
 -- Часовой пояс (смещение от UTC в часах). Например: 2 (Киев), 3 (Мск)
-config.timezone = 2
+config.timezone = 3
 
 -- РУБИЛЬНИК БАЗЫ ДАННЫХ
 -- true = работает с Firebase и веб-панелью
@@ -22,8 +22,8 @@ config.use_database = true
 
 -- Администраторы (кому доступна скрытая панель)
 config.admins = {
-    ["DesOope"] = true,
-    ["ник"] = true
+    ["Prorokius"] = true,
+    ["__HAPKOMAH__"] = true
 }
 
 return config

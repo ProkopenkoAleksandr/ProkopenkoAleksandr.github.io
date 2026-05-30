@@ -105,6 +105,18 @@ local internet = require("internet")
 local heartbeatTimer = 0
 local startedAt_hb = nil
 
+local function getRealTimeMs_hb()
+    local tmp = "/home/HostTime.tmp"
+    local f = io.open(tmp, "w")
+    if f then
+        f:write(""); f:close()
+        local lm = fs.lastModified(tmp)
+        fs.remove(tmp)
+        if lm and lm > 0 then return lm end
+    end
+    return nil
+end
+
 local function sendHeartbeat(stopped)
     if not (config.use_database and component.isAvailable("internet")) then return end
     if not config.firebase_url or config.firebase_url == "" then return end
@@ -118,6 +130,7 @@ local function sendHeartbeat(stopped)
             name = "Казино",
             type = "casino",
             last_seen = getRealTime(),
+            last_seen_ms = getRealTimeMs_hb(),
             started_at = startedAt_hb,
             cases_count = #casino_cases,
             online_user = (currentUser and currentUser.name) or nil,
