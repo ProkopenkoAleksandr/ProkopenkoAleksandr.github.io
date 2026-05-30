@@ -1661,9 +1661,16 @@
                 clearTimeout(to);
                 to = setTimeout(neiApplyFilters, 120);
             });
+            // Принудительно снимаем все галочки-фильтры при инициализации
+            // (браузер мог восстановить их из form state после перезагрузки).
             for (const id of ['nei-onlyPriced','nei-onlyWithIcon','nei-dedupId','nei-onlyInShop','nei-onlyNotInShop','nei-onlyInCrafter','nei-onlyNotInCrafter']) {
-                document.getElementById(id).addEventListener('change', neiApplyFilters);
+                const el = document.getElementById(id);
+                el.checked = false;
+                el.setAttribute('autocomplete', 'off');
+                el.addEventListener('change', neiApplyFilters);
             }
+            document.getElementById('nei-search').setAttribute('autocomplete', 'off');
+            document.getElementById('nei-search').value = '';
             document.getElementById('nei-sort').addEventListener('change', neiApplyFilters);
             document.getElementById('nei-pageSize').addEventListener('change', () => {
                 window.NEI.pageSize = parseInt(document.getElementById('nei-pageSize').value, 10) || 100;
@@ -2094,10 +2101,23 @@
         window.casinoPositionTooltip = casinoPositionTooltip;
 
         // ===== Каталог: открытие/закрытие =====
-        window.casinoOpenCatalog = function(itemIdx) {
+        window.casinoOpenCatalog = async function(itemIdx) {
             window.CASINO.catalogTargetItemIdx = itemIdx;
-            casinoFillCatalogModFilter();
             document.getElementById('casino-catalog-modal').classList.remove('hidden');
+            const grid = document.getElementById('casino-cat-grid');
+            const count = document.getElementById('casino-catalog-count');
+            // Если каталог NEI ещё не загружен — показываем прелоадер и грузим
+            if (!window.NEI || !window.NEI.all || !window.NEI.all.length) {
+                grid.innerHTML = '<div class="w-full text-center text-gray-400 py-12 font-bold">Загрузка каталога (~14 МБ)…</div>';
+                count.textContent = 'Загрузка...';
+                try {
+                    await neiInitOnce();
+                } catch (e) {
+                    grid.innerHTML = '<div class="w-full text-center text-red-400 py-12 font-bold">Не удалось загрузить каталог: ' + e.message + '</div>';
+                    return;
+                }
+            }
+            casinoFillCatalogModFilter();
             casinoRenderCatalogItems();
             document.getElementById('casino-cat-search').focus();
         };
