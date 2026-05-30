@@ -55,7 +55,7 @@ end
 -- ОСНОВНОЕ ОКНО
 -- state = {
 --   jobs        = массив {key, name, amount, status, age_sec}
---   recentLog   = массив строк (новые сверху)
+--   recentLog   = массив строк (не используется, логи теперь только в Firebase)
 --   secondsToTick = число (до следующего тика)
 --   totalRequested = сколько заказано всего за сессию
 --   totalCompleted = сколько завершилось успешно
@@ -117,9 +117,9 @@ function gui.draw(state)
     txt(W - 10,  5, "Действ.",  gui.COLORS.label, gui.COLORS.panel)
 
     -- ===== Список крафтов =====
+    -- Логи больше не отображаются в GUI (только Firebase / админка). Растягиваем список во всю высоту.
     local listTop = 6
-    local logHeight = 8
-    local listBottom = H - logHeight - 1
+    local listBottom = H - 1
     local maxRows = listBottom - listTop + 1
 
     if #state.jobs == 0 then
@@ -164,19 +164,6 @@ function gui.draw(state)
         end
     end
 
-    -- ===== Лог =====
-    local logTop = listBottom + 1
-    rect(1, logTop, W, 1, gui.COLORS.panel)
-    txt(2, logTop, "ЛОГ (новые сверху):", gui.COLORS.label, gui.COLORS.panel)
-    for i = 1, math.min(logHeight - 1, #state.recentLog) do
-        local line = state.recentLog[i]
-        local col = gui.COLORS.text
-        if line:find("ОШИБКА", 1, true) or line:find("ПРОВАЛ", 1, true) then col = gui.COLORS.bad
-        elseif line:find("ЗАКАЗАН", 1, true) then col = gui.COLORS.good
-        elseif line:find("ОТМЕНЁН", 1, true) then col = gui.COLORS.warn
-        elseif line:find("ЗАВЕРШЁН", 1, true) then col = gui.COLORS.good end
-        txt(2, logTop + i, unicode.sub(line, 1, W - 4), col, gui.COLORS.bg)
-    end
 end
 
 function gui.checkClick(x, y)
