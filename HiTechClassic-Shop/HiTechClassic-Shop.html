@@ -527,16 +527,23 @@
                         </div>
                         <button onclick="casinoCloseCatalog()" class="text-gray-400 hover:text-white text-2xl sm:text-3xl font-bold bg-gray-800 hover:bg-gray-700 w-10 h-10 sm:w-12 sm:h-12 rounded-xl transition flex items-center justify-center shrink-0">✕</button>
                     </div>
-                    <div class="p-4 sm:p-6 bg-gray-900 border-b border-gray-800 flex flex-col sm:flex-row gap-3 sm:gap-4 z-10">
-                        <div class="flex-1 relative">
+                    <div class="p-4 sm:p-6 bg-gray-900 border-b border-gray-800 flex flex-col gap-3 z-10">
+                        <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">🔍</div>
-                            <input type="text" id="casino-cat-search" placeholder="Поиск (имя, ID)..." class="w-full bg-gray-800 border border-gray-700 text-white rounded-xl pl-10 sm:pl-12 pr-4 py-2.5 sm:py-3 focus:border-blue-500 outline-none">
+                            <input type="text" id="casino-cat-search" autocomplete="off" placeholder="Поиск (имя, ID)..." class="w-full bg-gray-800 border border-gray-700 text-white rounded-xl pl-10 sm:pl-12 pr-4 py-2.5 sm:py-3 focus:border-blue-500 outline-none">
                         </div>
-                        <div class="w-full sm:w-64 shrink-0">
-                            <select id="casino-cat-mod" class="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 sm:py-3 focus:border-blue-500 outline-none appearance-none cursor-pointer">
-                                <option value="ALL">Все моды</option>
-                            </select>
-                        </div>
+                        <details open>
+                            <summary class="cursor-pointer text-sm text-gray-300 hover:text-white mb-2">
+                                Моды (<span id="casino-mod-count">все</span>)
+                            </summary>
+                            <div class="flex gap-2 mb-2 flex-wrap">
+                                <button id="casino-mod-all" type="button" class="px-3 py-1 rounded text-xs font-medium text-gray-200 bg-gray-700 hover:bg-gray-600 transition">все</button>
+                                <button id="casino-mod-none" type="button" class="px-3 py-1 rounded text-xs font-medium text-gray-200 bg-gray-700 hover:bg-gray-600 transition">снять</button>
+                                <button id="casino-mod-invert" type="button" class="px-3 py-1 rounded text-xs font-medium text-gray-200 bg-gray-700 hover:bg-gray-600 transition">инвертировать</button>
+                                <button id="casino-mod-default" type="button" class="px-3 py-1 rounded text-xs font-medium text-gray-200 bg-gray-700 hover:bg-gray-600 transition">по умолчанию</button>
+                            </div>
+                            <div id="casino-mod-list" class="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 bg-gray-800 border border-gray-700 rounded custom-scrollbar"></div>
+                        </details>
                     </div>
                     <div class="flex-1 overflow-y-auto p-2 sm:p-6 custom-scrollbar relative">
                         <div id="casino-cat-grid" class="flex flex-wrap gap-1 content-start justify-center sm:justify-start max-w-[1200px] mx-auto pb-8"></div>
@@ -1989,6 +1996,9 @@
             catalogTargetItemIdx: null,
             catalogPage: 1,
             catalogPageSize: 20,
+            allMods: [],                 // полный список модов в базе
+            selectedMods: new Set(),     // выбранные в фильтре каталога
+            modsInitialized: false,
         };
 
         async function casinoInit() {
@@ -2015,9 +2025,6 @@
             });
 
             document.getElementById('casino-cat-search').addEventListener('input', () => {
-                window.CASINO.catalogPage = 1; casinoRenderCatalogItems();
-            });
-            document.getElementById('casino-cat-mod').addEventListener('change', () => {
                 window.CASINO.catalogPage = 1; casinoRenderCatalogItems();
             });
 
@@ -2048,19 +2055,82 @@
 
         // ===== Каталог: используем window.NEI.all =====
         function casinoFillCatalogModFilter() {
-            const sel = document.getElementById('casino-cat-mod');
             const arr = (window.NEI && window.NEI.all) ? window.NEI.all : [];
             if (!arr.length) {
-                document.getElementById('casino-catalog-count').textContent = 'Открой NEI для загрузки каталога';
+                document.getElementById('casino-catalog-count').textContent = 'Загрузка...';
                 return;
             }
-            const mods = new Set();
-            for (const x of arr) if (x.mod_id) mods.add(x.mod_id);
-            sel.innerHTML = '<option value="ALL">Все моды</option>';
-            Array.from(mods).sort().forEach(m => {
-                const o = document.createElement('option'); o.value = m; o.textContent = m; sel.appendChild(o);
-            });
+            // подсчёт по модам
+            const counts = {};
+            for (const x of arr) {
+                const m = x.mod_id || '?';
+                counts[m] = (counts[m] || 0) + 1;
+            }
+            window.CASINO.allMods = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+
+            // первая инициализация — заполняем selectedMods дефолтным набором (как в NEI)
+            if (!window.CASINO.modsInitialized) {
+                const present = (typeof NEI_DEFAULT_MODS !== 'undefined') ? NEI_DEFAULT_MODS.filter(m => counts[m]) : [];
+                const init = present.length ? present : window.CASINO.allMods;
+                window.CASINO.selectedMods = new Set(init);
+                window.CASINO.modsInitialized = true;
+                // биндим кнопки управления (один раз)
+                document.getElementById('casino-mod-all').addEventListener('click', () => {
+                    window.CASINO.selectedMods = new Set(window.CASINO.allMods);
+                    window.CASINO.catalogPage = 1; casinoRenderModChips(counts); casinoRenderCatalogItems();
+                });
+                document.getElementById('casino-mod-none').addEventListener('click', () => {
+                    window.CASINO.selectedMods.clear();
+                    window.CASINO.catalogPage = 1; casinoRenderModChips(counts); casinoRenderCatalogItems();
+                });
+                document.getElementById('casino-mod-invert').addEventListener('click', () => {
+                    const inv = new Set();
+                    for (const m of window.CASINO.allMods) if (!window.CASINO.selectedMods.has(m)) inv.add(m);
+                    window.CASINO.selectedMods = inv;
+                    window.CASINO.catalogPage = 1; casinoRenderModChips(counts); casinoRenderCatalogItems();
+                });
+                document.getElementById('casino-mod-default').addEventListener('click', () => {
+                    const def = (typeof NEI_DEFAULT_MODS !== 'undefined') ? NEI_DEFAULT_MODS.filter(m => counts[m]) : window.CASINO.allMods;
+                    window.CASINO.selectedMods = new Set(def);
+                    window.CASINO.catalogPage = 1; casinoRenderModChips(counts); casinoRenderCatalogItems();
+                });
+            }
+            casinoRenderModChips(counts);
             document.getElementById('casino-catalog-count').textContent = arr.length + ' шт.';
+        }
+
+        function casinoRenderModChips(counts) {
+            const wrap = document.getElementById('casino-mod-list');
+            wrap.innerHTML = '';
+            for (const m of window.CASINO.allMods) {
+                const lab = document.createElement('label');
+                lab.className = 'mod-chip';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = window.CASINO.selectedMods.has(m);
+                cb.className = 'rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500';
+                cb.addEventListener('change', () => {
+                    if (cb.checked) window.CASINO.selectedMods.add(m);
+                    else window.CASINO.selectedMods.delete(m);
+                    casinoUpdateModCountLabel();
+                    window.CASINO.catalogPage = 1;
+                    casinoRenderCatalogItems();
+                });
+                const name = document.createElement('span');
+                name.textContent = m;
+                const cnt = document.createElement('span');
+                cnt.className = 'mod-count text-gray-400 tabular';
+                cnt.textContent = counts[m] || 0;
+                lab.append(cb, name, cnt);
+                wrap.appendChild(lab);
+            }
+            casinoUpdateModCountLabel();
+        }
+
+        function casinoUpdateModCountLabel() {
+            const total = window.CASINO.allMods.length;
+            const sel = window.CASINO.selectedMods.size;
+            document.getElementById('casino-mod-count').textContent = (sel === total) ? 'все' : (sel + ' из ' + total);
         }
 
         function casinoGetIconUrl(stringId, dmg) {
@@ -2139,7 +2209,9 @@
 
         function casinoRenderCatalogItems() {
             const search = document.getElementById('casino-cat-search').value.trim().toLowerCase();
-            const mod = document.getElementById('casino-cat-mod').value;
+            const sel = window.CASINO.selectedMods;
+            const allModsCount = window.CASINO.allMods.length;
+            const usingAllMods = (sel.size === allModsCount);
             const grid = document.getElementById('casino-cat-grid');
             const empty = document.getElementById('casino-cat-empty');
             empty.classList.add('hidden');
@@ -2152,7 +2224,7 @@
                 return;
             }
 
-            if (!search && mod === 'ALL') {
+            if (!search && usingAllMods) {
                 grid.innerHTML = '<div class="w-full text-center text-gray-500 py-8 text-sm">'
                     + '🔍 Начни вводить название или ID<br>'
                     + '<span class="text-xs text-gray-600">Всего в базе: ' + arr.length.toLocaleString('ru') + ' предметов</span>'
@@ -2165,7 +2237,7 @@
             const matches = [];
             for (let i = 0; i < arr.length; i++) {
                 const it = arr[i];
-                if (mod !== 'ALL' && it.mod_id !== mod) continue;
+                if (!usingAllMods && !sel.has(it.mod_id || '?')) continue;
                 let score = -1;
                 if (search) {
                     const n = (it.name || '').toLowerCase();
