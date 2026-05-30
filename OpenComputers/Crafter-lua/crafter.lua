@@ -29,19 +29,9 @@ if maxConcurrent < 1 then maxConcurrent = 1 end
 
 -- ===== Состояние =====
 local activeJobs = {}  -- [key] = {job, name, amount, started_at, key, id, damage, start_stock, produced}
-local recentLog = {}   -- лог в памяти (новые сверху)
-local MAX_LOG_LINES = 25       -- было 60 — на OC экономим RAM
 local JOB_TTL_SEC = 3600       -- max возраст job в activeJobs — иначе принудительно убираем (1 час)
-local MAX_LOG_LINE_LEN = 180   -- обрезаем длинные details
-local TICKS_PER_GC = 10        -- запускать GC каждые N итераций event-loop'а
+local TICKS_PER_GC = 10        -- диагностика памяти каждые N итераций event-loop'а
 local tickCounter = 0
-
--- Ротация лог-файла
-local LOG_FILE = "/home/crafter.log"
-local LOG_MAX_BYTES = 50000          -- максимум 50 КБ
-local LOG_KEEP_BYTES = 10000         -- оставляем последние 10 КБ
-local LOG_CHECK_EVERY = 50           -- проверять размер раз в N вызовов log()
-local logWriteCounter = 0
 
 local lastTickAt = -INTERVAL  -- чтобы первый тик случился сразу
 local secondsToTick = 0
@@ -101,52 +91,18 @@ local function getRealTime()
     return os.date("%Y-%m-%d %H:%M:%S") .. " (игр)"
 end
 
-local function pushLog(line)
-    -- защита от очень длинных строк (логи могут есть RAM)
-    if #line > MAX_LOG_LINE_LEN then line = line:sub(1, MAX_LOG_LINE_LEN) .. "…" end
-    table.insert(recentLog, 1, line)
-    while #recentLog > MAX_LOG_LINES do table.remove(recentLog) end
-end
-
+-- Логирование ТОЛЬКО в Firebase /logs.
+-- Локально (RAM/диск) ничего не храним — экономим RAM на OC.
 local function log(action, details)
-    local t = getRealTime()
-    local short = "[" .. t:sub(12, 19) .. "] " .. action .. " | " .. (details or "")
-    pushLog(short)
-    -- В файл — с полной датой
-    local fileLine = string.format("[%s] %s | crafter | %s", t, action, details or "")
-    local f = io.open(LOG_FILE, "a")
-    if f then f:write(fileLine .. "\n"); f:close() end
-
-    -- Ротация лога — проверяем размер не на каждый вызов, а раз в LOG_CHECK_EVERY
-    logWriteCounter = logWriteCounter + 1
-    if logWriteCounter >= LOG_CHECK_EVERY then
-        logWriteCounter = 0
-        local sz = fs.size(LOG_FILE)
-        if sz and sz > LOG_MAX_BYTES then
-            local fr = io.open(LOG_FILE, "r")
-            if fr then
-                fr:seek("end", -LOG_KEEP_BYTES)
-                local tail = fr:read("*a") or ""
-                fr:close()
-                local fw = io.open(LOG_FILE, "w")
-                if fw then
-                    -- первая строка может быть обрезанной — отбрасываем до первого \n
-                    local nl = tail:find("\n", 1, true)
-                    if nl then tail = tail:sub(nl + 1) end
-                    fw:write(tail)
-                    fw:close()
-                end
-            end
-        end
-    end
-    -- В БД (опционально, не блокируем)
-    if config.use_database then
-        pcall(function()
-            network.request("POST", "/logs", json.encode({
-                time = t, action = action, user = "crafter", details = details or ""
-            }))
-        end)
-    end
+    if not config.use_database then return end
+    pcall(function()
+        network.request("POST", "/logs", json.encode({
+            time = getRealTime(),
+            action = action,
+            user = "crafter",
+            details = details or "",
+        }))
+    end)
 end
 
 -- =========================================================
@@ -568,7 +524,7 @@ local function buildState()
     end
     return {
         jobs = out,
-        recentLog = recentLog,
+        recentLog = {},   -- больше не используется (логи только в Firebase), оставлено для совместимости GUI
         secondsToTick = secondsToTick,
         totalCompleted = totalCompleted,
         totalFailed = totalFailed,
@@ -648,26 +604,8 @@ end
 -- =========================================================
 -- ОСНОВНОЙ ЦИКЛ
 -- =========================================================
--- При старте один раз проверим размер лога — если уже жирный, сразу обрежем
-do
-    local sz = fs.size(LOG_FILE)
-    if sz and sz > LOG_MAX_BYTES then
-        local fr = io.open(LOG_FILE, "r")
-        if fr then
-            fr:seek("end", -LOG_KEEP_BYTES)
-            local tail = fr:read("*a") or ""
-            fr:close()
-            local fw = io.open(LOG_FILE, "w")
-            if fw then
-                local nl = tail:find("\n", 1, true)
-                if nl then tail = tail:sub(nl + 1) end
-                fw:write(tail)
-                fw:close()
-                io.stdout:write("[crafter] лог обрезан с " .. sz .. " до ~" .. LOG_KEEP_BYTES .. " байт\n")
-            end
-        end
-    end
-end
+-- Если на диске остался старый лог от прошлых версий — удаляем его
+pcall(function() if fs.exists("/home/crafter.log") then fs.remove("/home/crafter.log") end end)
 
 log("СТАРТ", string.format("interval=%ds, default_amount=%d, max_concurrent=%d",
     INTERVAL, DEFAULT_AMOUNT, maxConcurrent))
