@@ -52,24 +52,22 @@ local function getRealTime()
     return os.date("%Y-%m-%d %H:%M:%S") .. " (игр)"
 end
 
+-- Логирование ТОЛЬКО в Firebase /logs.
+-- На диск/в RAM не сохраняем, чтобы не есть память OC.
 local function logToFile(msg)
-    local f = io.open("/home/me_snapshot.log", "a")
-    if f then f:write("[" .. getRealTime() .. "] " .. msg .. "\n"); f:close() end
-    -- ротация
-    local sz = fs.size("/home/me_snapshot.log")
-    if sz and sz > 30000 then
-        local fr = io.open("/home/me_snapshot.log", "r")
-        if fr then
-            fr:seek("end", -10000)
-            local tail = fr:read("*a") or ""
-            fr:close()
-            local nl = tail:find("\n", 1, true)
-            if nl then tail = tail:sub(nl + 1) end
-            local fw = io.open("/home/me_snapshot.log", "w")
-            if fw then fw:write(tail); fw:close() end
-        end
-    end
+    if not config.use_database then return end
+    pcall(function()
+        network.request("POST", "/logs", json.encode({
+            time = getRealTime(),
+            action = "ME-SNAPSHOT",
+            user = "me_snapshot",
+            details = msg or "",
+        }))
+    end)
 end
+
+-- На случай если на диске остался старый лог от прошлых версий — удаляем
+pcall(function() if fs.exists("/home/me_snapshot.log") then fs.remove("/home/me_snapshot.log") end end)
 
 -- =========================================================
 -- СНЯТИЕ SNAPSHOT'А
