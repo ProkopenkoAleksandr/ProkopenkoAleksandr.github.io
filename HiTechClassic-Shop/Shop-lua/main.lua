@@ -85,45 +85,36 @@ local function getRealTime()
     return os.date("%Y-%m-%d %H:%M:%S") .. " (Игр.)"
 end
 
+-- Логирование ТОЛЬКО в Firebase /logs. На диске не сохраняем — экономим RAM/диск OC.
 local function writeLog(action, user, details)
-    local time_str = getRealTime()
-    local log_line = string.format("[%s] %s | %s | %s", time_str, action, user, details)
-    local f = io.open("/home/shop_logs.txt", "a")
-    if f then f:write(log_line .. "\n"); f:close() end
-    
-    if config.use_database and component.isAvailable("internet") then
-        pcall(function() network.request("POST", "/logs", json.encode({ time = time_str, action = action, user = user, details = details })) end)
-    end
-
-    local size = fs.size("/home/shop_logs.txt")
-    if size and size > 200000 then 
-        local lines = {}
-        local fr = io.open("/home/shop_logs.txt", "r")
-        if fr then for line in fr:lines() do table.insert(lines, line) end; fr:close() end
-        local fw = io.open("/home/shop_logs.txt", "w")
-        if fw then
-            local start_idx = math.max(1, #lines - 200)
-            for i = start_idx, #lines do fw:write(lines[i] .. "\n") end
-            fw:close()
-        end
-    end
+    if not (config.use_database and component.isAvailable("internet")) then return end
+    pcall(function()
+        network.request("POST", "/logs", json.encode({
+            time = getRealTime(),
+            action = action,
+            user = user,
+            details = details,
+        }))
+    end)
 end
 
+-- Старый локальный лог-файл больше не нужен — если остался от прошлых версий, удаляем
+pcall(function() if fs.exists("/home/shop_logs.txt") then fs.remove("/home/shop_logs.txt") end end)
+
 local function loadLogsLocal(filter)
+    -- больше не используется — оставлена-заглушка для совместимости старого UI.
+    -- Возвращает пояснительное сообщение вместо логов.
     local logs = {}
-    local f = io.open("/home/shop_logs.txt", "r")
-    if f then
-        for line in f:lines() do 
-            if not filter or filter == "" or string.find(unicode.lower(line), unicode.lower(filter), 1, true) then table.insert(logs, line) end
-        end
-        f:close()
+    if false then
+        for line in (function() end) do end
+        if filter then end
     end
-    local res = {}
-    local count = #logs
-    local start = math.max(1, count - 150)
-    for i = count, start, -1 do table.insert(res, logs[i]) end
-    if #res == 0 then table.insert(res, "Логов пока нет или по фильтру ничего не найдено...") end
-    return res
+    -- логи теперь только в админке сайта
+    return {
+        "Логи теперь только в админке (Firebase).",
+        "Открой /HiTechClassic-Shop.html на сервере → вкладка \"Логи\".",
+        "На компьютере локальные логи отключены для экономии памяти.",
+    }
 end
 
 local function loadUsersLocal()
