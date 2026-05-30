@@ -457,7 +457,7 @@
                         <div class="w-12">Иконка</div>
                         <div class="flex-1 min-w-0">Название</div>
                         <div class="w-52 min-w-0">ID</div>
-                        <div class="w-16 text-right">Мета</div>
+                        <div class="w-16">Мета</div>
                         <div class="w-20 text-right">В МЭ</div>
                         <div class="w-24">Хранить</div>
                         <div class="w-24">Заказ по</div>
@@ -1540,9 +1540,9 @@
                   + '    <div class="md:hidden text-[10px] uppercase text-gray-500 mb-0.5">ID</div>'
                   + '    <div class="mono text-[11px] text-blue-300 truncate">' + neiEsc(it.id || '') + '</div>'
                   + '  </div>'
-                  + '  <div class="md:w-16 md:text-right">'
-                  + '    <div class="md:hidden text-[10px] uppercase text-gray-500 mb-0.5">Мета</div>'
-                  + '    <div class="mono tabular text-[11px] text-gray-400">' + (it.damage ?? 0) + '</div>'
+                  + '  <div class="md:w-16">'
+                  + '    <label class="text-[10px] uppercase text-gray-500 block md:hidden mb-0.5">Мета</label>'
+                  + '    <input type="number" min="0" step="1" id="cr-damage-' + key + '" value="' + (it.damage ?? 0) + '" class="w-full bg-gray-700 text-gray-300 font-mono text-[11px] px-2 py-1 rounded border border-gray-600 focus:outline-none focus:border-blue-500">'
                   + '  </div>'
                   + '  <div class="md:w-20 md:text-right">'
                   + '    <div class="md:hidden text-[10px] uppercase text-gray-500 mb-0.5">В МЭ</div>'
@@ -1781,6 +1781,14 @@
             const name = document.getElementById('cr-name-' + key).value;
             const keep = parseInt(document.getElementById('cr-keep-' + key).value, 10);
             const craftAmount = parseInt(document.getElementById('cr-craft-' + key).value, 10);
+            const damageEl = document.getElementById('cr-damage-' + key);
+            const damageRaw = damageEl ? damageEl.value : '';
+            let damage = 0;
+            if (damageRaw !== '') {
+                const d = parseInt(damageRaw, 10);
+                if (!Number.isFinite(d) || d < 0) { showToast('Некорректная мета (должна быть ≥ 0)', 'error'); return; }
+                damage = d;
+            }
             if (!Number.isFinite(keep) || keep < 0) { showToast('Некорректное "Хранить"', 'error'); return; }
             if (!Number.isFinite(craftAmount) || craftAmount < 1) { showToast('Некорректное "Заказ по"', 'error'); return; }
             db.ref('crafter').once('value').then((snap) => {
@@ -1792,12 +1800,14 @@
                     items[key].name = name;
                     items[key].keep_amount = keep;
                     items[key].craft_amount = craftAmount;
+                    items[key].damage = damage;
                     cd.items = items;
                     db.ref('crafter').set(cd)
                         .then(() => {
                             showToast('Сохранено: ' + name, 'success');
                             neiLog('АВТОКРАФТ ИЗМЕНЁН',
                                 '«' + name + '» (id=' + (items[key].id || '—')
+                                + ', мета=' + damage
                                 + ', хранить=' + keep + ', заказ_по=' + craftAmount + ')');
                         })
                         .catch(e => { console.error(e); showToast('Ошибка сохранения', 'error'); });
