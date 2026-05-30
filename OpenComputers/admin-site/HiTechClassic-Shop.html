@@ -259,7 +259,7 @@
                                         <th class="px-4 py-2">Игрок</th>
                                         <th class="px-4 py-2 text-right">Потратил ЭМ</th>
                                         <th class="px-4 py-2 text-right">Получил ЭМ</th>
-                                        <th class="px-4 py-2 text-right">Чистый</th>
+                                        <th class="px-4 py-2 text-right" title="Профит игрока: получил − потратил">Профит</th>
                                         <th class="px-4 py-2 text-right">Транзакций</th>
                                     </tr>
                                 </thead>
@@ -930,8 +930,11 @@
             const all = (window.LOGS_STATE && window.LOGS_STATE.shared) ? window.LOGS_STATE.shared : [];
             const stats = parseShopLogs(all);
 
-            const profit = stats.totalBought - stats.totalSold;
-            const margin = stats.totalBought > 0 ? (profit / stats.totalBought * 100) : 0;
+            // Прибыль магазина = что мы выплатили за скупку - что игроки заплатили за товары.
+            // Положительное значение = магазин накопил товаров по нашим ценам.
+            const profit = stats.totalSold - stats.totalBought;
+            const denom = Math.max(stats.totalBought, stats.totalSold);
+            const margin = denom > 0 ? (profit / denom * 100) : 0;
 
             // Hero
             const heroBox = document.getElementById('shop-analytics-hero');
@@ -945,11 +948,11 @@
             } else if (profit >= 0) {
                 heroBox.classList.add('bg-green-600');
                 heroTitle.textContent = '+' + profit.toFixed(0) + ' ЭМ';
-                heroSub.textContent = 'Чистая выручка магазина';
+                heroSub.textContent = 'Чистая прибыль (скупка − продажи)';
             } else {
                 heroBox.classList.add('bg-red-600');
                 heroTitle.textContent = profit.toFixed(0) + ' ЭМ';
-                heroSub.textContent = 'Магазин в минусе';
+                heroSub.textContent = 'Магазин в минусе (продажи > скупки)';
             }
 
             document.getElementById('shop-stat-bought').textContent = stats.totalBought.toFixed(0) + ' ЭМ';
@@ -1038,7 +1041,10 @@
                 tPlayers.innerHTML = '<tr><td colspan="5" class="px-4 py-4 text-center text-gray-500">нет активности</td></tr>';
             } else {
                 tPlayers.innerHTML = playersArr.map(p => {
-                    const net = p.spent - p.received;
+                    // Профит игрока: получил - потратил.
+                    // + (зелёный) = игрок в плюсе (магазин потерял на нём)
+                    // - (красный) = игрок в минусе (магазин заработал на нём)
+                    const net = p.received - p.spent;
                     const netCls = net > 0 ? 'text-green-400' : (net < 0 ? 'text-red-400' : 'text-gray-400');
                     return '<tr class="hover:bg-gray-800/60">'
                       + '<td class="px-4 py-2 text-purple-300 font-bold">' + neiEsc(p.name) + '</td>'
