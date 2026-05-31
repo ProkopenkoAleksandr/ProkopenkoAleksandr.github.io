@@ -34,7 +34,12 @@ local active_category = "ВСЕ"
 local currentUser = nil
 local idleTimer = 0
 local msgTimer = 0
-local syncTimer = 60   -- реже sync = меньше памяти на парсинг JSON
+-- syncTimer тянет /shop (товары, категории, скупка) — меняются редко,
+-- двигаем до 5 минут (раньше 60с → каждую минуту парсили ~50КБ JSON, это
+-- было основным источником временного мусора).
+local syncTimer = 300
+-- usersSyncTimer тянет /users (балансы) — должен обновляться часто
+local usersSyncTimer = 60
 
 -- Heartbeat для дашборда (функция объявлена ниже, после getRealTime)
 local heartbeatTimer = 0
@@ -74,19 +79,35 @@ local function formatUnixTime(unix)
 end
 
 -- === ТРЮК С ФАЙЛОМ ДЛЯ РЕАЛЬНОГО ВРЕМЕНИ ===
+-- Кеш реального времени — обновляется не чаще раза в 5 сек.
+-- Без кеша getRealTime создавал/удалял файл при каждом логе → мог утекать
+-- через JVM-мост OpenComputers.
+local _rt_cached_str = nil
+local _rt_cached_ms = 0
+local _rt_cache_at_uptime = 0
+
 local function getRealTime()
+    local now_up = computer.uptime()
+    if _rt_cached_str and (now_up - _rt_cache_at_uptime) < 5 then
+        -- интерполируем: к закешированному ms добавляем прошедшие секунды
+        local interpMs = _rt_cached_ms + math.floor((now_up - _rt_cache_at_uptime) * 1000)
+        local tz = tonumber(config.timezone) or 0
+        return formatUnixTime(math.floor(interpMs / 1000) + tz * 3600)
+    end
     local tz = tonumber(config.timezone) or 0
     local tmp_file = "/home/HostTime.tmp"
     local file = io.open(tmp_file, "w")
     if file then
-        -- pcall гарантирует close() даже если write упадёт
         pcall(function() file:write("") end)
         pcall(function() file:close() end)
         local lastModifiedMs = fs.lastModified(tmp_file)
         pcall(function() fs.remove(tmp_file) end)
         if lastModifiedMs and lastModifiedMs > 0 then
-            local current_unix = math.floor(lastModifiedMs / 1000)
-            return formatUnixTime(current_unix + (tz * 3600))
+            _rt_cached_ms = lastModifiedMs
+            _rt_cache_at_uptime = now_up
+            local s = formatUnixTime(math.floor(lastModifiedMs / 1000) + tz * 3600)
+            _rt_cached_str = s
+            return s
         end
     end
     return os.date("%Y-%m-%d %H:%M:%S") .. " (Игр.)"
@@ -287,9 +308,24 @@ local function getAdminPageItems(list, limit)
     return pageData, maxPage
 end
 
+-- Кеш стоков ME-сети.
+-- Раньше me.updateStock() вызывалась на КАЖДЫЙ refreshScreen → каждый клик/scroll
+-- запрашивал getItemsInNetwork() (массив на 5000+ предметов = ~1.5МБ Lua-таблиц).
+-- При активном игроке это создавало 50-100 МБ мусора в минуту → главная причина OOM.
+-- Теперь обновляем не чаще раза в 15 секунд + принудительно перед покупкой/скупкой.
+local STOCK_REFRESH_INTERVAL = 15
+local lastStockUpdate = 0
+local function refreshStocksIfStale(force)
+    local now = computer.uptime()
+    if force or (now - lastStockUpdate) >= STOCK_REFRESH_INTERVAL then
+        me.updateStock(shop_items)
+        lastStockUpdate = now
+    end
+end
+
 local function refreshScreen()
     if state == "shop" then
-        me.updateStock(shop_items)
+        refreshStocksIfStale(false)
         gui.drawStatic(currentUser, currentUser and idleTimer or nil, #cart, getTop3Players(), shop_name)
         gui.drawSearch(search_query, search_focus)
         gui.drawCategories(categories, active_category)
@@ -364,15 +400,16 @@ end
 
 local function checkMemory()
     memCheckTimer = memCheckTimer + 1
-    if memCheckTimer < 30 then return end
+    if memCheckTimer < 15 then return end  -- 15с вместо 30 — раньше реагируем
     memCheckTimer = 0
     local total = computer.totalMemory()
     local free = computer.freeMemory()
     if not (total and total > 0) then return end
     local usedPct = math.floor((total - free) * 100 / total)
 
-    -- WARNING (80%) — однократный
-    if usedPct >= 80 and not memWarnedLowOnce then
+    -- WARNING (70%) — однократный. Понижен с 80% т.к. между warning и крахом
+    -- остается слишком мало времени при активной утечке.
+    if usedPct >= 70 and not memWarnedLowOnce then
         memWarnedLowOnce = true
         writeLog("⚠ RAM ПЕРЕПОЛНЕНА", "shop", string.format(
             "Оперативка OC-компьютера занята на %d%% (%d/%d KB). " ..
@@ -380,35 +417,58 @@ local function checkMemory()
             "или подними интервалы синка в config.lua.",
             usedPct, math.floor((total-free)/1024), math.floor(total/1024)))
     end
-    if usedPct < 60 then memWarnedLowOnce = false end
+    if usedPct < 55 then memWarnedLowOnce = false end
 
-    -- АВАРИЙНЫЙ СБРОС при 90% — обнуляем большие in-memory таблицы
-    if usedPct >= 90 and not pendingReboot then
+    -- ИММЕДИАТНЫЙ РЕБУТ при 92% — нет смысла пытаться восстановить,
+    -- даже если игрок в магазине: всё равно через секунды OOM.
+    if usedPct >= 92 then
+        writeLog("🆘 RAM ПРЕДЕЛ", "shop", string.format(
+            "RAM = %d%% — экстренный ребут. Восстановление невозможно.", usedPct))
+        executeRebootNow(usedPct)
+        return
+    end
+
+    -- АВАРИЙНЫЙ СБРОС при 82% — обнуляем ВСЕ большие in-memory таблицы.
+    -- Раньше чистили только users_db — оказалось мало, утечка происходила и
+    -- в shop_items/buyback/категориях после регулярного sync.
+    if usedPct >= 82 and not pendingReboot then
         writeLog("⚠ RAM КРИТИЧНО", "shop", string.format(
-            "RAM %d%%, очищаю кеши (users_db). Sleep 0.5s для GC.", usedPct))
+            "RAM %d%%, очищаю ВСЕ кеши (users_db, shop_items, categories, shop_buyback). Sleep 2s для GC.",
+            usedPct))
         users_db = {}
-        syncTimer = 1
-        os.sleep(0.5)
+        shop_items = {}
+        categories = {}
+        shop_buyback = {}
+        -- cart очищаем только если никого нет — иначе игрок потеряет покупки
+        if currentUser == nil then
+            cart = {}
+            ed_data = {}
+            selectedItem = nil
+            search_query = ""
+        end
+        syncTimer = 1  -- следующий тик принудительно подтянет /shop+/users
+        usersSyncTimer = 1
+        os.sleep(2)    -- больше времени GC, чем 0.5с
 
         local free2 = computer.freeMemory()
         local usedPct2 = math.floor((total - free2) * 100 / total)
-        if usedPct2 < 90 then
+        -- Recovery считаем успешной только если упали ниже 65% (раньше было <90%
+        -- — это означало "ещё не упало в reboot", а не "реально восстановилось").
+        if usedPct2 < 65 then
             writeLog("✓ RAM ВОССТАНОВЛЕНА", "shop", string.format(
                 "Сброс помог: было %d%%, стало %d%%", usedPct, usedPct2))
             return
         end
 
-        -- Сброс не помог — планируем reboot
+        -- Сброс не помог достаточно — планируем reboot
         if currentUser == nil then
-            -- никто не пользуется — можно ребутить немедленно
             executeRebootNow(usedPct2)
         else
-            -- кто-то в магазине — даём grace-период до выхода
             pendingReboot = true
             rebootDeadline = computer.uptime() + MAX_REBOOT_GRACE
             writeLog("⚠ ОТЛОЖЕННЫЙ ПЕРЕЗАГРУЗ", "shop", string.format(
-                "RAM = %d%%. Игрок %s в магазине — reboot через %d сек или после выхода.",
-                usedPct2, currentUser.name, MAX_REBOOT_GRACE))
+                "RAM = %d%% (после сброса было %d%%). Игрок %s в магазине — reboot через %d сек или после выхода.",
+                usedPct2, usedPct, currentUser.name, MAX_REBOOT_GRACE))
         end
     end
 end
@@ -456,13 +516,14 @@ local function shopTick()
         end
         if state == "shop" and not shouldRefreshFull then
             if config.use_database and component.isAvailable("internet") then
+                -- /shop (товары) — раз в 5 минут. Меняется редко через сайт.
                 syncTimer = syncTimer - 1
                 if syncTimer <= 0 then
-                    syncTimer = 60   -- было 15: реже синк = меньше JSON-аллокаций
+                    syncTimer = 300
                     local s, r = network.get("/shop")
                     if s and r and r ~= "null" then
                         local p = json.decode(r)
-                        r = nil  -- освобождаем большую строку
+                        r = nil
                         if p then
                             if p.categories then categories = p.categories end
                             if p.items then shop_items = p.items end
@@ -471,6 +532,13 @@ local function shopTick()
                         end
                         p = nil
                     end
+                    shouldRefreshFull = true
+                end
+                -- /users (балансы) — раз в 60с, нужен для актуальности после
+                -- внешних пополнений через сайт.
+                usersSyncTimer = usersSyncTimer - 1
+                if usersSyncTimer <= 0 then
+                    usersSyncTimer = 60
                     local su, ru = network.get("/users")
                     if su and ru and ru ~= "null" then
                         local pu = json.decode(ru)
@@ -717,6 +785,7 @@ local function shopTick()
                             else
                                 local balBefore = currentUser.balance
                                 local success, msg, earned = me.sellAll(shop_buyback)
+                                lastStockUpdate = 0  -- сразу подтянем новые стоки после скупки
                                 if success then
                                     currentUser.balance = currentUser.balance + earned; saveUser()
                                     writeLog("ПРОДАЖА", currentUser.name,
@@ -768,6 +837,7 @@ local function shopTick()
                             else
                                 local balBefore = currentUser.balance
                                 local ok, msg, actual_moved = me.buyItem(selectedItem, selectedQty)
+                                lastStockUpdate = 0  -- сразу подтянем новые стоки после покупки
                                 if ok and actual_moved and actual_moved > 0 then
                                     local actual_cost = selectedItem.price * actual_moved
                                     currentUser.balance = currentUser.balance - actual_cost; saveUser(); saveShop()
@@ -801,6 +871,7 @@ local function shopTick()
                                 else
                                     local all_ok, actual_total = true, 0
                                     local receipt_str = ""
+                                    lastStockUpdate = 0  -- сразу подтянем новые стоки после оформления корзины
                                     for _, ci in ipairs(cart) do
                                         local ok, msg, actual_moved = me.buyItem(ci.item, ci.qty)
                                         if ok and actual_moved and actual_moved > 0 then

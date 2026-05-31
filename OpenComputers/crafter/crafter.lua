@@ -84,8 +84,18 @@ local function formatUnixTime(unix)
     return string.format("%04d-%02d-%02d %02d:%02d:%02d", y, m, d, h, min, s)
 end
 
+-- Кеш реального времени: io.open + fs.remove каждый вызов = JVM-мост, утечка.
+-- Обновляем не чаще раза в 5 сек, между ними интерполируем uptime.
+local _rt_cached_ms = 0
+local _rt_cache_at_uptime = 0
+
 local function getRealTime()
     local tz = tonumber(config.timezone) or 0
+    local now_up = computer.uptime()
+    if _rt_cached_ms > 0 and (now_up - _rt_cache_at_uptime) < 5 then
+        local interpMs = _rt_cached_ms + math.floor((now_up - _rt_cache_at_uptime) * 1000)
+        return formatUnixTime(math.floor(interpMs / 1000) + tz * 3600)
+    end
     local tmp_file = "/home/HostTime.tmp"
     local f = io.open(tmp_file, "w")
     if f then
@@ -93,7 +103,11 @@ local function getRealTime()
         pcall(function() f:close() end)
         local lm = fs.lastModified(tmp_file)
         pcall(function() fs.remove(tmp_file) end)
-        if lm and lm > 0 then return formatUnixTime(math.floor(lm / 1000) + tz * 3600) end
+        if lm and lm > 0 then
+            _rt_cached_ms = lm
+            _rt_cache_at_uptime = now_up
+            return formatUnixTime(math.floor(lm / 1000) + tz * 3600)
+        end
     end
     return os.date("%Y-%m-%d %H:%M:%S") .. " (игр)"
 end
@@ -300,8 +314,13 @@ local function countActive()
     return n
 end
 
--- Возвращает unix-timestamp в миллисекундах (UTC)
+-- Возвращает unix-timestamp в миллисекундах (UTC). Использует тот же кеш,
+-- что getRealTime, чтобы не делать второй io.open за один тик.
 local function getRealTimeMs()
+    local now_up = computer.uptime()
+    if _rt_cached_ms > 0 and (now_up - _rt_cache_at_uptime) < 5 then
+        return _rt_cached_ms + math.floor((now_up - _rt_cache_at_uptime) * 1000)
+    end
     local tmp = "/home/HostTime.tmp"
     local f = io.open(tmp, "w")
     if not f then return nil end
@@ -309,7 +328,11 @@ local function getRealTimeMs()
     pcall(function() f:close() end)
     local lm = fs.lastModified(tmp)
     pcall(function() fs.remove(tmp) end)
-    if lm and lm > 0 then return lm end
+    if lm and lm > 0 then
+        _rt_cached_ms = lm
+        _rt_cache_at_uptime = now_up
+        return lm
+    end
     return nil
 end
 
@@ -701,8 +724,9 @@ local function loop()
             if total and total > 0 then
                 local usedPct = math.floor((total - free) * 100 / total)
 
-                -- WARNING (80%) — однократный
-                if usedPct >= 80 and not memWarnedLowOnce then
+                -- WARNING (70%) — однократный. Понижен с 80% т.к. между warning
+                -- и крахом было слишком мало времени.
+                if usedPct >= 70 and not memWarnedLowOnce then
                     memWarnedLowOnce = true
                     log("⚠ RAM ПЕРЕПОЛНЕНА", string.format(
                         "Оперативка OC-компьютера занята на %d%% (%d/%d KB). " ..
@@ -710,36 +734,52 @@ local function loop()
                         "или подними интервалы синка в config.lua.",
                         usedPct, math.floor((total-free)/1024), math.floor(total/1024)))
                 end
-                if usedPct < 60 then memWarnedLowOnce = false end
+                if usedPct < 55 then memWarnedLowOnce = false end
 
-                -- АВАРИЙНЫЙ СБРОС при 90% — обнуляем кеши, даём GC сработать
-                if usedPct >= 90 then
+                -- ЭКСТРЕННЫЙ РЕБУТ при 92% — восстановление невозможно
+                if usedPct >= 92 then
+                    log("🆘 RAM ПРЕДЕЛ", string.format(
+                        "RAM = %d%% — экстренный ребут. После reboot — автостарт из .shrc.",
+                        usedPct))
+                    pcall(function() sendHeartbeat(true) end)
+                    os.sleep(3)
+                    computer.shutdown(true)
+                end
+
+                -- АВАРИЙНЫЙ СБРОС при 82% — обнуляем ВСЕ возможные кеши
+                if usedPct >= 82 then
                     log("⚠ RAM КРИТИЧНО", string.format(
-                        "RAM %d%%, очищаю кеши: cachedItems, activeJobs done-jobs, " ..
-                        "renderResults. Sleep 0.5s для GC.", usedPct))
+                        "RAM %d%%, очищаю ВСЕ кеши: cachedItems, issues, completed jobs. " ..
+                        "Sleep 2s для GC.", usedPct))
                     cachedItems = nil
+                    -- issues — массив диагностических строк, может расти
+                    issues = {}
+                    cpuInfo = nil
                     -- удаляем все ссылки на завершённые job-объекты
                     for k, j in pairs(activeJobs) do
                         local ok, done = pcall(function() return j.job.isDone() end)
                         if ok and done then activeJobs[k] = nil end
                     end
-                    os.sleep(0.5)  -- GC time
+                    os.sleep(2)
 
                     local free2 = computer.freeMemory()
                     local usedPct2 = math.floor((total - free2) * 100 / total)
-                    if usedPct2 >= 90 then
-                        -- сброс не помог — перезагружаем комп.
-                        -- Даём 10 сек на отправку финального heartbeat'а — дашборд успеет показать "STOPPED"
+                    -- Recovery считаем успешной только если упали ниже 65%.
+                    if usedPct2 >= 80 then
                         log("⚠ АВАРИЙНЫЙ ПЕРЕЗАГРУЗ", string.format(
-                            "После сброса кешей RAM = %d%%. Reboot через 10 сек. " ..
-                            "После reboot программа автостартует из /home/.shrc.",
+                            "После сброса кешей RAM = %d%% (всё ещё критично). " ..
+                            "Reboot через 5 сек. После reboot — автостарт из .shrc.",
                             usedPct2))
-                        pcall(function() if sendHeartbeat then sendHeartbeat(true) end end)
-                        os.sleep(10)
+                        pcall(function() sendHeartbeat(true) end)
+                        os.sleep(5)
                         computer.shutdown(true)
-                    else
+                    elseif usedPct2 < 65 then
                         log("✓ RAM ВОССТАНОВЛЕНА", string.format(
                             "Сброс помог: было %d%%, стало %d%%", usedPct, usedPct2))
+                    else
+                        log("⚠ RAM ЧАСТИЧНО", string.format(
+                            "Сброс уменьшил RAM с %d%% до %d%%, но ещё высоко. " ..
+                            "Будем чистить снова через %d с.", usedPct, usedPct2, TICKS_PER_GC))
                     end
                 end
             end
