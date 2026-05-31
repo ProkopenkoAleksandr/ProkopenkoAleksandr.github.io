@@ -1,27 +1,27 @@
--- /lua/config.lua  (ME-Snapshots)
-local config = {}
+-- /home/config.lua  (me-snapshot)
+--
+-- Токен НЕ хранится в этом файле — он лежит в /home/secret.lua
+-- (который НЕ комитится в git, см. secret.lua.example).
+--
+-- Если /home/secret.lua не существует или пустой — программа упадёт с понятной
+-- ошибкой "pocketbase_token не настроен".
 
--- =====================================================================
--- ПОДКЛЮЧЕНИЕ К FIREBASE (тот же что у магазина/крафтера)
--- =====================================================================
+local fs = require("filesystem")
+local secret = {}
+if fs.exists("/home/secret.lua") then
+    local ok, loaded = pcall(dofile, "/home/secret.lua")
+    if ok and type(loaded) == "table" then secret = loaded end
+end
 
-config.firebase_url = "заменить"
-config.db_secret = "заменить"
-config.timezone = 3
+return {
+    pocketbase_url   = "https://prorokius.space",
+    pocketbase_token = secret.pocketbase_token or "",
+    use_database     = true,
 
--- =====================================================================
--- ПАРАМЕТРЫ СНАПШОТОВ
--- =====================================================================
+    log_source = "me_snapshot",
+    timezone   = 3,
 
--- Интервал в секундах между снапшотами. 60 = раз в минуту.
-config.snapshot_interval = 60
-
--- Минимальное количество штук — позиции с меньшим size не попадают в snapshot.
--- 0 = слать вообще всё. Помогает, если в МЭ очень много мусора.
-config.min_size = 1
-
--- Максимум позиций в одном snapshot. Если в сети больше — отрезаются самые мелкие.
--- Защита от слишком большого JSON-payload'а в Firebase.
-config.max_items = 5000
-
-return config
+    snapshot_interval = 60,
+    min_size          = 1,
+    max_items         = 5000,
+}

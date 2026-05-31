@@ -9,6 +9,7 @@ local files = {
     "network.lua",
     "json.lua",
     "me_snapshot.lua",
+    "secret.lua.example",
 }
 
 print("=== УСТАНОВКА ME-Snapshot ===")
