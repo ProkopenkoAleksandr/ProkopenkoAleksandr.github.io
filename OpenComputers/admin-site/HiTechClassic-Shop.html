@@ -133,7 +133,13 @@
             <div id="content-dashboard" class="tab-content block">
                 <div class="flex items-center justify-between mb-4 gap-4 flex-wrap">
                     <h2 class="text-2xl font-bold">Дашборд системы</h2>
-                    <div id="dashboard-summary" class="text-sm text-gray-400">—</div>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <button id="notify-toggle-btn" onclick="toggleOfflineNotifications()"
+                            class="px-3 py-1.5 rounded-md text-xs font-medium bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 transition">
+                            🔕 Уведомления выкл.
+                        </button>
+                        <div id="dashboard-summary" class="text-sm text-gray-400">—</div>
+                    </div>
                 </div>
                 <div id="dashboard-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div class="text-gray-500 p-6 col-span-full text-center">Загрузка…</div>
@@ -3617,6 +3623,139 @@
         }
 
         // =====================================================================
+        // УВЕДОМЛЕНИЯ ОБ ОТКЛЮЧЕНИИ OC-КОМПОВ
+        // =====================================================================
+        // Логика: в renderDashboard() сравниваем новое состояние каждого id с
+        // предыдущим. При переходе из «живого» (on/warning) в «мёртвое»
+        // (off/stopped) — показываем системное уведомление + проигрываем beep.
+        // Первый renderDashboard после загрузки страницы НЕ триггерит уведомления
+        // (иначе при заходе на страницу с уже-офлайн компом прилетит spam).
+        const NOTIFY = {
+            prevStates: {},                  // { id → 'on'|'warning'|'off'|'stopped' }
+            initialized: false,              // true после первого renderDashboard
+            audioCtx: null,
+        };
+        const ALIVE_STATES = { on: true, warning: true };
+        const DEAD_STATES  = { off: true, stopped: true };
+
+        function isNotifyEnabled() {
+            return localStorage.getItem('notify_offline_enabled') === '1'
+                && 'Notification' in window
+                && Notification.permission === 'granted';
+        }
+
+        function updateNotifyButton() {
+            const btn = document.getElementById('notify-toggle-btn');
+            if (!btn) return;
+            if (isNotifyEnabled()) {
+                btn.innerHTML = '🔔 Уведомления вкл.';
+                btn.className = 'px-3 py-1.5 rounded-md text-xs font-medium bg-green-900/40 hover:bg-green-900/60 border border-green-700/50 text-green-300 transition';
+            } else {
+                btn.innerHTML = '🔕 Уведомления выкл.';
+                btn.className = 'px-3 py-1.5 rounded-md text-xs font-medium bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 transition';
+            }
+        }
+
+        async function toggleOfflineNotifications() {
+            if (!('Notification' in window)) {
+                alert('Браузер не поддерживает Notifications API');
+                return;
+            }
+            if (isNotifyEnabled()) {
+                localStorage.setItem('notify_offline_enabled', '0');
+                updateNotifyButton();
+                return;
+            }
+            // Запрашиваем permission если ещё не дано
+            if (Notification.permission !== 'granted') {
+                const res = await Notification.requestPermission();
+                if (res !== 'granted') {
+                    alert('Чтобы уведомления работали, разреши их в браузере для этого сайта.');
+                    return;
+                }
+            }
+            localStorage.setItem('notify_offline_enabled', '1');
+            updateNotifyButton();
+            // Тестовое уведомление — заодно «разблокирует» Audio context (autoplay policy)
+            playAlertSound();
+            try {
+                new Notification('🔔 Уведомления включены', {
+                    body: 'Теперь ты получишь алерт, если какой-то OC-компьютер уйдёт в офлайн.',
+                    icon: '/favicon.ico',
+                    tag: 'notify-test',
+                });
+            } catch (e) { /* ignore */ }
+        }
+
+        function playAlertSound() {
+            try {
+                if (!NOTIFY.audioCtx) {
+                    NOTIFY.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                const ctx = NOTIFY.audioCtx;
+                // Двойной «бип-бип» (как у пейджера)
+                const playBeep = (when, freq) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0, ctx.currentTime + when);
+                    gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + when + 0.02);
+                    gain.gain.setValueAtTime(0.25, ctx.currentTime + when + 0.18);
+                    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + when + 0.22);
+                    osc.connect(gain).connect(ctx.destination);
+                    osc.start(ctx.currentTime + when);
+                    osc.stop(ctx.currentTime + when + 0.25);
+                };
+                playBeep(0,    880);
+                playBeep(0.30, 660);
+            } catch (e) { /* ignore */ }
+        }
+
+        function notifyWentOffline(id, h, newState) {
+            const name = (h && (h.name || h.type)) || id;
+            const reason = newState === 'stopped' ? 'остановлена корректно' : 'не отвечает';
+            try {
+                const n = new Notification('⚠ ' + name + ' офлайн', {
+                    body: 'OC-программа «' + name + '» ' + reason
+                        + '. Открой дашборд чтобы проверить.',
+                    icon: '/favicon.ico',
+                    tag: 'oc-offline-' + id,         // tag заменяет старое уведомление того же компа
+                    requireInteraction: false,
+                });
+                n.onclick = () => { window.focus(); n.close(); };
+            } catch (e) { /* ignore */ }
+            playAlertSound();
+        }
+
+        function processDashboardTransitions(items) {
+            if (!NOTIFY.initialized) {
+                // Первый рендер — только запоминаем состояния, не уведомляем
+                for (const it of items) NOTIFY.prevStates[it.id] = it.state;
+                NOTIFY.initialized = true;
+                return;
+            }
+            const seen = {};
+            for (const it of items) {
+                seen[it.id] = true;
+                const prev = NOTIFY.prevStates[it.id];
+                const next = it.state;
+                if (prev && ALIVE_STATES[prev] && DEAD_STATES[next] && isNotifyEnabled()) {
+                    notifyWentOffline(it.id, it.h, next);
+                }
+                NOTIFY.prevStates[it.id] = next;
+            }
+            // Удаляем исчезнувшие id чтобы prevStates не разрастался
+            for (const id of Object.keys(NOTIFY.prevStates)) {
+                if (!seen[id]) delete NOTIFY.prevStates[id];
+            }
+        }
+
+        // Инициализация кнопки при загрузке
+        if (typeof document !== 'undefined') {
+            document.addEventListener('DOMContentLoaded', updateNotifyButton);
+        }
+
         // ДАШБОРД — статусы всех OC-программ из /heartbeats
         // =====================================================================
         function renderDashboard() {
@@ -3646,6 +3785,11 @@
                 if (state === 'on' || state === 'warning') online++; else offline++;
                 items.push({ id, h, ageSec, state });
             }
+            // Триггерим уведомления о переходах online → offline ДО сортировки —
+            // чтобы порядок в массиве совпадал с предыдущим вызовом (стабильнее
+            // для prevStates-сравнения).
+            processDashboardTransitions(items);
+
             // сортируем: сначала проблемные, потом по имени
             const stateRank = { off: 0, stopped: 1, warning: 2, on: 3 };
             items.sort((a, b) => {
