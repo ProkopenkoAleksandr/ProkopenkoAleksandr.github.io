@@ -55,10 +55,18 @@ local function pbRequest(method, urlPath, bodyJson)
     return false, "Сеть: " .. tostring(errOrResult)
 end
 
+-- URL-encode для query параметров (PB filter содержит '(' ')' "'" — браузер
+-- кодирует их автоматически, но OC internet.request — нет, и PB не находит запись.
+local function urlEncode(s)
+    return (s:gsub("[^A-Za-z0-9_.~%-]", function(c)
+        return string.format("%%%02X", string.byte(c))
+    end))
+end
+
 local function pbFind(collection, filter, perPage, sort)
     local q = "perPage=" .. (perPage or 1)
-    if filter then q = q .. "&filter=" .. filter end
-    if sort   then q = q .. "&sort="   .. sort   end
+    if filter then q = q .. "&filter=" .. urlEncode(filter) end
+    if sort   then q = q .. "&sort="   .. urlEncode(sort)   end
     local ok, body = pbRequest("GET", "/api/collections/" .. collection .. "/records?" .. q)
     if not ok then return nil, body end
     local parsed = json.decode(body); body = nil
