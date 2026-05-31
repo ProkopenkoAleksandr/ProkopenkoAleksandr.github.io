@@ -1,29 +1,25 @@
--- /lua/config.lua
-local config = {}
+-- /home/config.lua  (shop)
+--
+-- Токен НЕ хранится в этом файле — он лежит в /home/secret.lua
+-- (который НЕ комитится в git, см. secret.lua.example).
+--
+-- Если /home/secret.lua не существует или пустой — программа упадёт с понятной
+-- ошибкой "pocketbase_token не настроен".
 
--- ССЫЛКА НА БАЗУ ДАННЫХ (без слеша / на конце)
--- В ГИТХАБЕ ОСТАВЛЯЕМ ПУСТЫМ! Заполняем только на компьютере в игре.
-config.firebase_url = "заменить"
+local fs = require("filesystem")
+local secret = {}
+if fs.exists("/home/secret.lua") then
+    local ok, loaded = pcall(dofile, "/home/secret.lua")
+    if ok and type(loaded) == "table" then secret = loaded end
+end
 
--- Секретный ключ базы данных Firebase
--- В ГИТХАБЕ ОСТАВЛЯЕМ ПУСТЫМ! Заполняем только на компьютере в игре.
-config.db_secret = "заменить"
+return {
+    pocketbase_url   = "https://prorokius.space",
+    pocketbase_token = secret.pocketbase_token or "",
+    use_database     = true,
 
--- Название валюты
-config.currency_name = "ЭМ"
+    log_source = "shop",
+    timezone   = 3,
 
--- Часовой пояс (смещение от UTC в часах). Например: 2 (Киев), 3 (Мск)
-config.timezone = 3
-
--- РУБИЛЬНИК БАЗЫ ДАННЫХ
--- true = работает с Firebase и веб-панелью
--- false = работает полностью оффлайн (только жесткий диск)
-config.use_database = true
-
--- Администраторы (кому доступна скрытая панель)
-config.admins = {
-    ["Prorokius"] = true,
-    ["__HAPKOMAH__"] = true
+    admins = { "Prorokius", "__HAPKOMAH__" },
 }
-
-return config
