@@ -161,7 +161,16 @@
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 gap-2">
                         <div>
                             <h2 class="text-2xl sm:text-3xl font-black text-white">Аналитика магазина</h2>
-                            <p class="text-xs sm:text-sm text-gray-400 mt-1">На основе логов <code class="text-blue-300">/logs</code>. Учитываются последние 500 записей.</p>
+                            <p class="text-xs sm:text-sm text-gray-400 mt-1">На основе логов <code class="text-blue-300">/logs</code>. <span id="shop-analytics-meta">учитывается весь период</span>.</p>
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-xs text-gray-500 uppercase tracking-wide">Период:</span>
+                            <div id="shop-period-tabs" class="flex bg-gray-800 rounded-lg p-1 border border-gray-700">
+                                <button data-period="1d"  class="shop-period-btn px-3 py-1 text-xs rounded-md font-medium transition">24 ч</button>
+                                <button data-period="7d"  class="shop-period-btn px-3 py-1 text-xs rounded-md font-medium transition">7 дн</button>
+                                <button data-period="30d" class="shop-period-btn px-3 py-1 text-xs rounded-md font-medium transition">30 дн</button>
+                                <button data-period="all" class="shop-period-btn px-3 py-1 text-xs rounded-md font-medium transition">Всё</button>
+                            </div>
                         </div>
                     </div>
 
@@ -932,8 +941,55 @@
             return { totalBought, totalSold, buyCount, sellCount, itemsBought, itemsSold, players };
         }
 
+        // Период аналитики хранится глобально, чтобы кнопки и графики были в sync.
+        window.SHOP_ANALYTICS = window.SHOP_ANALYTICS || {};
+        if (!window.SHOP_ANALYTICS.period) window.SHOP_ANALYTICS.period = 'all';
+
+        function shopPeriodLabel(p) {
+            if (p === '1d')  return 'за последние 24 часа';
+            if (p === '7d')  return 'за последние 7 дней';
+            if (p === '30d') return 'за последние 30 дней';
+            return 'за всё время';
+        }
+        function shopPeriodCutoffMs(p) {
+            if (p === '1d')  return Date.now() - 24 * 3600 * 1000;
+            if (p === '7d')  return Date.now() - 7  * 24 * 3600 * 1000;
+            if (p === '30d') return Date.now() - 30 * 24 * 3600 * 1000;
+            return 0;  // 'all' — без отсечки
+        }
+        function shopSetPeriod(p) {
+            window.SHOP_ANALYTICS.period = p;
+            // подсветка активной кнопки
+            document.querySelectorAll('.shop-period-btn').forEach(btn => {
+                const active = btn.getAttribute('data-period') === p;
+                btn.className = 'shop-period-btn px-3 py-1 text-xs rounded-md font-medium transition '
+                    + (active ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700');
+            });
+            try { shopRenderAnalytics(); } catch(e) {}
+        }
+        // вешаем обработчики после загрузки DOM
+        if (typeof document !== 'undefined') {
+            document.addEventListener('DOMContentLoaded', () => {
+                document.querySelectorAll('.shop-period-btn').forEach(btn => {
+                    btn.addEventListener('click', () => shopSetPeriod(btn.getAttribute('data-period')));
+                });
+                shopSetPeriod(window.SHOP_ANALYTICS.period);
+            });
+        }
+
         function shopRenderAnalytics() {
-            const all = (window.LOGS_STATE && window.LOGS_STATE.shared) ? window.LOGS_STATE.shared : [];
+            const allRaw = (window.LOGS_STATE && window.LOGS_STATE.shared) ? window.LOGS_STATE.shared : [];
+            const period = window.SHOP_ANALYTICS.period || 'all';
+            const cutoff = shopPeriodCutoffMs(period);
+            // фильтр по времени лога (parseLogTime уже корректно учитывает TZ)
+            const all = cutoff === 0 ? allRaw : allRaw.filter(log => {
+                const t = parseLogTime(log.time);
+                return t && t >= cutoff;
+            });
+            // показываем в подзаголовке какой период и сколько записей попало
+            const metaEl = document.getElementById('shop-analytics-meta');
+            if (metaEl) metaEl.textContent = shopPeriodLabel(period) + ' (записей: ' + all.length + ')';
+
             const stats = parseShopLogs(all);
 
             // Прибыль магазина = что мы выплатили за скупку - что игроки заплатили за товары.
@@ -1201,7 +1257,11 @@
                 shared: [], casino: [], filter: 'all', search: '', bound: false
             };
 
-            db.ref('logs').orderByKey().limitToLast(500).on('value', (snapshot) => {
+            // Подписка тянет до 20000 последних логов (~несколько месяцев работы магазина).
+            // Аналитика магазина считается ПО ВСЕМУ загруженному окну с фильтром
+            // периода в UI (24ч/7д/30д/всё). Раньше было 500 — это могло покрывать
+            // лишь часы, и «оборот за 500 записей» был бессмысленным числом.
+            db.ref('logs').orderByKey().limitToLast(20000).on('value', (snapshot) => {
                 const raw = snapshot.val() || {};
                 const arr = [];
                 for (const key in raw) {
